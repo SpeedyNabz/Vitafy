@@ -1,0 +1,24 @@
+{
+  "status": "passed",
+  "scope": "offline mock UI; no Spotify login or audio",
+  "assertions": [
+    "search entry and results",
+    "library navigation",
+    "account-derived Liked Songs URI",
+    "Now Playing",
+    "queue",
+    "overlay freezes drawing",
+    "foreground resumes drawing",
+    "quit draws no extra frame"
+  ],
+  "executable_sha256": "ff292cd61c5ad07dd66e30afc3be9ea0eac4d510ae12e2acf609b92a5108f2a3",
+  "source_lock_sha256": "56a10806bc1085f1779224023eca56aeaee81f8d047c2b8afe34a9fb70d0e2ed",
+  "platform": "Windows/MSVC 2022",
+  "ctest_scenarios": [
+    "mock_premium",
+    "mock_login_transition",
+    "mock_free_account",
+    "notifications"
+  ],
+  "ctest_result": "4/4 passed"
+}

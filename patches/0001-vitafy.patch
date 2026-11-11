@@ -1,0 +1,996 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -3,11 +3,11 @@
+ # PS Vita:  cmake -B build-vita -DCMAKE_TOOLCHAIN_FILE=$VITASDK/share/vita.toolchain.cmake
+ # Desktop:  cmake -B build      (needs SDL2, SDL2_ttf, SDL2_image via pkg-config)
+ 
+-project(VitaSpot C)
++project(Vitafy C)
+ 
+ # App version, shown in Settings and at the top of vam.log. A "d" suffix marks
+ # a development build; it changes only when a release is cut.
+-set(VITASPOT_VERSION "0.0.4")
++set(VITAFY_VERSION "0.1.0-preview.1" CACHE STRING "Version shown in the app")
+ 
+ set(CMAKE_C_STANDARD 11)
+ set(CMAKE_C_STANDARD_REQUIRED ON)
+@@ -23,6 +23,7 @@
+     src/main.c
+     src/app.c
+     src/lyrics.c
++    src/notifications.c
+     src/model.c
+     src/power.c
+     src/prefs.c
+@@ -52,54 +53,56 @@
+     message(FATAL_ERROR "VAM_BACKEND must be 'mock' or 'external'")
+ endif()
+ 
+-add_executable(VitaSpot ${FRONTEND_SOURCES})
+-target_include_directories(VitaSpot PRIVATE include src)
+-target_compile_definitions(VitaSpot PRIVATE VAM_APP_VERSION="${VITASPOT_VERSION}")
++add_executable(Vitafy ${FRONTEND_SOURCES})
++target_include_directories(Vitafy PRIVATE include src)
++target_compile_definitions(Vitafy PRIVATE VAM_APP_VERSION="${VITAFY_VERSION}")
+ 
+ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+-    target_compile_options(VitaSpot PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers)
++    target_compile_options(Vitafy PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers)
+ endif()
+ 
+ if(VAM_BACKEND STREQUAL "external")
+     if(NOT VAM_BACKEND_LIB)
+         message(FATAL_ERROR "Set VAM_BACKEND_LIB to the backend library")
+     endif()
+-    target_link_libraries(VitaSpot PRIVATE ${VAM_BACKEND_LIB} ${VAM_BACKEND_LINK_LIBS})
++    target_link_libraries(Vitafy PRIVATE ${VAM_BACKEND_LIB} ${VAM_BACKEND_LINK_LIBS})
+ endif()
+ 
+ if(VITA)
+     include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
+ 
+-    set(VITA_APP_NAME "VitaSpot")
++    set(VITA_APP_NAME "Vitafy")
+     set(VITA_TITLEID "VTAM00001")
+-    set(VITA_VERSION "01.00")
++    set(VITA_VERSION "01.14")
++    # Retain the device-verified base value; package a separate Home test.
++    set(VITA_MKSFOEX_FLAGS "${VITA_MKSFOEX_FLAGS} -d ATTRIBUTE=32768 -d PARENTAL_LEVEL=1")
+ 
+-    target_include_directories(VitaSpot PRIVATE $ENV{VITASDK}/arm-vita-eabi/include/SDL2)
++    target_include_directories(Vitafy PRIVATE $ENV{VITASDK}/arm-vita-eabi/include/SDL2)
+ 
+     # Static link order matters. If the linker reports missing symbols, the
+     # installed vdpm packages were built with different options: add the
+     # library it names (e.g. brotlidec, webpdemux) to this list.
+-    target_link_libraries(VitaSpot PRIVATE
++    target_link_libraries(Vitafy PRIVATE
+         SDL2_ttf SDL2_image SDL2
+         freetype harfbuzz png jpeg webpdemux webp sharpyuv z bz2
+         SceDisplay_stub SceCtrl_stub SceAudio_stub SceAudioIn_stub SceSysmodule_stub
+         SceGxm_stub SceCommonDialog_stub SceAppMgr_stub SceAppUtil_stub SceTouch_stub
+         SceHid_stub SceMotion_stub ScePower_stub SceProcessmgr_stub SceKernelDmacMgr_stub
+-        SceIme_stub SceAVConfig_stub SceRegistryMgr_stub pthread m
++        SceNotificationUtil_stub SceIme_stub SceAVConfig_stub SceRegistryMgr_stub pthread m
+     )
+ 
+-    vita_create_self(eboot.bin VitaSpot UNSAFE)
++    vita_create_self(eboot.bin Vitafy UNSAFE)
+ 
+     # Bundle everything under assets/ (fonts etc.).
+-    file(GLOB_RECURSE VAM_ASSETS RELATIVE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/assets/*)
++    file(GLOB_RECURSE VAM_ASSETS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/assets/*)
+     set(VAM_ASSET_ARGS "")
+     foreach(a ${VAM_ASSETS})
+         if(NOT a MATCHES "README")
+-            list(APPEND VAM_ASSET_ARGS FILE ${CMAKE_SOURCE_DIR}/${a} ${a})
++            list(APPEND VAM_ASSET_ARGS FILE ${CMAKE_CURRENT_SOURCE_DIR}/${a} ${a})
+         endif()
+     endforeach()
+ 
+-    vita_create_vpk(VitaSpot.vpk ${VITA_TITLEID} eboot.bin
++    vita_create_vpk(Vitafy.vpk ${VITA_TITLEID} eboot.bin
+         VERSION ${VITA_VERSION}
+         NAME ${VITA_APP_NAME}
+         FILE sce_sys/icon0.png sce_sys/icon0.png
+@@ -111,11 +114,11 @@
+ else()
+     find_package(PkgConfig REQUIRED)
+     pkg_check_modules(SDL REQUIRED IMPORTED_TARGET sdl2 SDL2_ttf SDL2_image)
+-    target_link_libraries(VitaSpot PRIVATE PkgConfig::SDL m)
++    target_link_libraries(Vitafy PRIVATE PkgConfig::SDL m)
+     if(WIN32)
+         # Keep a console for SDL_Log output; drop -mwindows.
+-        target_link_options(VitaSpot PRIVATE -mconsole)
++        target_link_options(Vitafy PRIVATE -mconsole)
+     endif()
+-    add_custom_command(TARGET VitaSpot POST_BUILD
+-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:VitaSpot>/assets)
++    add_custom_command(TARGET Vitafy POST_BUILD
++        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE_DIR:Vitafy>/assets)
+ endif()
+--- a/backend/mock/mock_backend.c
++++ b/backend/mock/mock_backend.c
+@@ -147,7 +147,7 @@
+         mplaylist *pl = &g_pls[p];
+         snprintf(pl->uri, VAM_URI_MAX, "spotify:playlist:mock%02d", p);
+         cpy(pl->title, VAM_TEXT_MAX, pl_titles[p]);
+-        cpy(pl->owner, sizeof(pl->owner), p < 3 ? "You" : "VitaSpot Mock");
++        cpy(pl->owner, sizeof(pl->owner), p < 3 ? "You" : "Vitafy Mock");
+         if (p == 1)
+             cpy(pl->desc, VAM_DESC_MAX, "Long roads, empty streets and synths. A mock playlist with a description "
+                                         "long enough to wrap onto a second line in the header.");
+@@ -669,7 +669,7 @@
+     build_catalogue();
+     memset(&g_auth, 0, sizeof(g_auth));
+     memset(&g_player, 0, sizeof(g_player));
+-    cpy(g_auth.device_name, sizeof(g_auth.device_name), config->device_name ? config->device_name : "VitaSpot");
++    cpy(g_auth.device_name, sizeof(g_auth.device_name), config->device_name ? config->device_name : "Vitafy");
+     g_auth.status = VAM_AUTH_STARTING;
+     g_player.volume = config->initial_volume;
+     g_player.is_active_device = 1;
+--- a/src/app.c
++++ b/src/app.c
+@@ -6,6 +6,7 @@
+ #include "gfx/images.h"
+ #include "gfx/text.h"
+ #include "lyrics.h"
++#include "notifications.h"
+ #include "platform/platform.h"
+ #include "power.h"
+ #include "prefs.h"
+@@ -75,6 +76,7 @@
+         v->more_req = 0;
+     }
+     v->failed = false;
++    v->more_failed = false;
+     v->req = vam_request_page(uri, 0, 50);
+     if (!v->req) {
+         v->failed = true;
+@@ -86,7 +88,9 @@
+ {
+     if (v->more_req || v->req || !model_has_more(v->page))
+         return;
++    v->more_failed = false;
+     v->more_req = vam_request_page(v->page->uri, v->page->sections[0].count, 50);
++    if (!v->more_req) v->more_failed = true;
+ }
+ 
+ static view *find_view_by_req(uint32_t id, bool *is_more)
+@@ -128,6 +132,7 @@
+ 
+ void app_switch_tab(int tab)
+ {
++    if (tab < 0 || tab >= TAB_COUNT) return;
+     A.nav = NAV_TAB;
+     A.nav_tab = tab;
+ }
+@@ -263,6 +268,12 @@
+ 
+ void app_toggle_saved(const char *uri, bool currently_saved)
+ {
++    int slot = -1;
++    for (int i = 0; i < PENDING_SAVES; i++) {
++        if (g_saves[i].req && strcmp(g_saves[i].uri, uri) == 0) return;
++        if (!g_saves[i].req && slot < 0) slot = i;
++    }
++    if (slot < 0) { app_toast("Library is busy. Try again shortly."); return; }
+     uint32_t req = vam_set_saved(uri, !currently_saved);
+     if (!req) {
+         app_toast("Couldn't update your library.");
+@@ -483,6 +494,9 @@
+         int before = A.auth.status;
+         vam_get_auth_state(&A.auth);
+         if (before == VAM_AUTH_LOGGED_IN && A.auth.status != VAM_AUTH_LOGGED_IN) {
++            for (int i = 0; i < PENDING_SAVES; i++)
++                if (g_saves[i].req) vam_cancel(g_saves[i].req);
++            memset(g_saves, 0, sizeof(g_saves));
+             reset_stacks();
+             lyrics_reset();
+         }
+@@ -499,6 +513,7 @@
+             break;
+         if (more) {
+             v->more_req = 0;
++            v->more_failed = ev->result != VAM_OK || !ev->page;
+             if (ev->result == VAM_OK && ev->page)
+                 model_append(v->page, ev->page);
+             break;
+@@ -561,11 +576,12 @@
+     load_recent();
+     prefs_load();
+     power_init();
++    notifications_reset();
+ 
+     vam_config cfg;
+     memset(&cfg, 0, sizeof(cfg));
+     cfg.api_version = VAM_API_VERSION;
+-    cfg.device_name = platform_is_vita() ? "PS Vita" : "VitaSpot Desktop";
++    cfg.device_name = platform_is_vita() ? "Vitafy PS Vita" : "Vitafy Desktop";
+     cfg.data_dir = platform_data_dir();
+     cfg.bitrate = prefs_get()->bitrate;
+     cfg.audio_cache_mb = (uint32_t)prefs_get()->cache_mb;
+@@ -577,7 +593,7 @@
+     vam_result res = vam_init(&cfg);
+     if (res != VAM_OK)
+         SDL_Log("vam_init failed: %d", res);
+-    vam_log("VitaSpot " VAM_APP_VERSION);
++    vam_log("Vitafy " VAM_APP_VERSION);
+     vam_get_auth_state(&A.auth);
+     vam_get_player_state(&A.player);
+     return true;
+@@ -684,7 +700,7 @@
+     ui_set_enabled(true);
+ }
+ 
+-bool app_drawing(void) { return !(platform_is_vita() && power_screen() == SCREEN_OFF); }
++bool app_drawing(void) { return platform_graphics_allowed() && !(platform_is_vita() && power_screen() == SCREEN_OFF); }
+ 
+ void app_frame(float dt)
+ {
+@@ -698,6 +714,11 @@
+     }
+     /* Snapshot every frame: cheap, and keeps the progress bar honest. */
+     vam_get_player_state(&A.player);
++    if (notifications_update(&A.player, vam_now_ms(), prefs_get()->notifications && A.auth.status == VAM_AUTH_LOGGED_IN)) {
++        char message[VAM_MSG_MAX];
++        snprintf(message, sizeof(message), "Now playing: %.120s - %.100s", A.player.track.title, A.player.track.subtitle);
++        app_toast(message);
++    }
+     if (!A.player.has_track && A.np_open)
+         app_set_now_playing(false);
+ 
+@@ -706,7 +727,8 @@
+         run_search(A.edit, false);
+     }
+ 
+-    power_frame();
++    if (platform_graphics_allowed())
++        power_frame();
+     prefs_frame();
+     lyrics_frame();
+     if (!app_drawing()) {
+--- a/src/app.h
++++ b/src/app.h
+@@ -29,6 +29,7 @@
+     uint32_t req;          /* pending first-page request          */
+     uint32_t more_req;     /* pending pagination request          */
+     bool failed;
++    bool more_failed; /* require explicit retry after a pagination error */
+     char error[VAM_MSG_MAX];
+     scroller scroll;
+     scroller shelves[MAX_SHELVES];
+@@ -125,6 +126,7 @@
+ void app_play_item(const vam_item *it, const char *context_uri, uint32_t index);
+ 
+ /* Shared widgets: widgets.c */
++void draw_vitafy_logo(float cx, float cy, float size);
+ void fmt_duration(uint32_t ms, char *buf, size_t n);
+ void draw_cover(const char *url, rectf r, float radius, int kind, const char *title);
+ bool icon_button(uint32_t id, icon_id icon, float cx, float cy, float size, float hit, color c);
+--- a/src/main.c
++++ b/src/main.c
+@@ -59,7 +59,7 @@
+     }
+ 
+     Uint32 wflags = platform_is_vita() ? 0 : SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+-    SDL_Window *win = SDL_CreateWindow("VitaSpot", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_W,
++    SDL_Window *win = SDL_CreateWindow("Vitafy", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_W,
+                                        SCREEN_H, wflags);
+     if (!win) {
+         SDL_Log("SDL_CreateWindow: %s", SDL_GetError());
+@@ -94,12 +94,18 @@
+     while (!A.quit) {
+         Uint64 t0 = SDL_GetPerformanceCounter();
+         devscript_frame(&A.quit);
++        if (A.quit)
++            break;
++        platform_poll_lifecycle();
+         SDL_Event e;
+         while (SDL_PollEvent(&e)) {
+             if (e.type == SDL_CONTROLLERDEVICEADDED && !platform_is_vita())
+                 SDL_GameControllerOpen(e.cdevice.which);
+-            app_handle_sdl_event(&e);
++            if (e.type == SDL_QUIT || platform_graphics_allowed())
++                app_handle_sdl_event(&e);
+         }
++        if (A.quit)
++            break; /* A quit request must not draw/present one more frame. */
+         Uint64 now = SDL_GetPerformanceCounter();
+         float dt = (float)((now - last) / freq);
+         last = now;
+@@ -109,9 +115,10 @@
+         ui_begin_frame(dt);
+         app_frame(dt);
+         ui_end_frame();
+-        devscript_after_render(ren);
++        platform_poll_lifecycle();
+         Uint64 t_drawn = SDL_GetPerformanceCounter();
+         if (app_drawing()) {
++            devscript_after_render(ren);
+             SDL_RenderPresent(ren);
+             gfx_flush_destroyed(false);
+         } else {
+--- a/src/prefs.c
++++ b/src/prefs.c
+@@ -40,6 +40,7 @@
+ 
+ void prefs_load(void)
+ {
++    g_prefs.notifications = true;
+     g_prefs.combo[0] = BTN_SELECT;
+     g_prefs.combo[1] = BTN_START;
+     g_prefs.dim_after = 30;
+@@ -71,7 +72,8 @@
+             if (sscanf(v, "%15[^+]+%15s", a, b) == 2) {
+                 int x = key_btn(a), y = key_btn(b);
+                 if (x >= 0 && y >= 0 && x != y) {
+-                    g_prefs.combo[0] = (btn)x;
++                    g_prefs.notifications = true;
++    g_prefs.combo[0] = (btn)x;
+                     g_prefs.combo[1] = (btn)y;
+                 }
+             }
+@@ -88,6 +90,8 @@
+             for (int i = 0; i < CACHE_CHOICE_COUNT; i++)
+                 if (CACHE_CHOICES[i] == mb)
+                     g_prefs.cache_mb = mb;
++        } else if (strcmp(line, "notifications") == 0) {
++            g_prefs.notifications = atoi(v) != 0;
+         } else if (strcmp(line, "lyrics") == 0) {
+             g_prefs.lyrics = atoi(v) != 0;
+         }
+@@ -112,6 +116,7 @@
+     fprintf(f, "screen_off_after=%d\n", g_prefs.off_after);
+     fprintf(f, "audio_quality=%d\n", g_prefs.bitrate);
+     fprintf(f, "audio_cache_mb=%d\n", g_prefs.cache_mb);
++    fprintf(f, "notifications=%d\n", g_prefs.notifications ? 1 : 0);
+     fprintf(f, "lyrics=%d\n", g_prefs.lyrics ? 1 : 0);
+     bool ok = !ferror(f);
+     if (fclose(f) != 0 || !ok) {
+--- a/src/prefs.h
++++ b/src/prefs.h
+@@ -11,6 +11,7 @@
+     int off_after;  /* seconds without input, 0 = never     */
+     int bitrate;    /* streaming quality: 96, 160 or 320    */
+     int cache_mb;   /* audio cache cap, one of CACHE_CHOICES */
++    bool notifications; /* track-change song/artist notifications */
+     bool lyrics;    /* Now Playing shows lyrics, not the art */
+ } prefs;
+ 
+--- a/src/theme.h
++++ b/src/theme.h
+@@ -5,7 +5,7 @@
+ #define SCREEN_W 960
+ #define SCREEN_H 544
+ 
+-#define SIDEBAR_W 76
++#define SIDEBAR_W 208
+ #define PLAYER_H 84
+ #define CONTENT_X SIDEBAR_W
+ #define CONTENT_Y 0
+--- a/src/gfx/images.c
++++ b/src/gfx/images.c
+@@ -104,7 +104,7 @@
+     }
+     /* An IS_DECODING job finishes on its own; its result won't match gen. */
+     gfx_destroy_texture_later(m->tex);
+-    free(m->url);
++    SDL_free(m->url);
+     free(m->data);
+     memset(m, 0, sizeof(*m));
+ }
+--- a/src/gfx/text.c
++++ b/src/gfx/text.c
+@@ -185,7 +185,7 @@
+         for (int j = 0; j < g_nfiles; j++)
+             seen = seen || strcmp(g_files[j].path, g_faces[i].path) == 0;
+         if (!seen)
+-            snprintf(g_files[g_nfiles++].path, sizeof(g_files[0].path), "%s", g_faces[i].path);
++            snprintf(g_files[g_nfiles++].path, sizeof(g_files[0].path), "%.511s", g_faces[i].path);
+         if (i <= FACE_BOLD)
+             g_nsync = g_nfiles;
+     }
+@@ -247,15 +247,15 @@
+     for (int i = 0; i < CACHE_N; i++) {
+         if (g_cache[i].tex)
+             SDL_DestroyTexture(g_cache[i].tex);
+-        free(g_cache[i].str);
++        SDL_free(g_cache[i].str);
+     }
+     memset(g_cache, 0, sizeof(g_cache));
+     for (int i = 0; i < BUCKETS; i++)
+         g_bucket[i] = -1;
+     for (int i = 0; i < WRAP_N; i++) {
+-        free(g_wrap[i].str);
++        SDL_free(g_wrap[i].str);
+         for (int j = 0; j < g_wrap[i].n; j++)
+-            free(g_wrap[i].lines[j]);
++            SDL_free(g_wrap[i].lines[j]);
+     }
+     memset(g_wrap, 0, sizeof(g_wrap));
+     if (g_preload) {
+@@ -292,9 +292,9 @@
+         /* Line breaks so far measured deferred CJK text with the primary
+            font's missing-glyph boxes; lay it out again with the real one. */
+         for (int i = 0; i < WRAP_N; i++) {
+-            free(g_wrap[i].str);
++            SDL_free(g_wrap[i].str);
+             for (int j = 0; j < g_wrap[i].n; j++)
+-                free(g_wrap[i].lines[j]);
++                SDL_free(g_wrap[i].lines[j]);
+         }
+         memset(g_wrap, 0, sizeof(g_wrap));
+     }
+@@ -318,7 +318,7 @@
+ static SDL_RWops *font_stream(const char *path)
+ {
+     bool preloaded = SDL_AtomicGet(&g_preloaded);
+-    for (int i = 0; i < g_nfiles; i++)
++    for (int i = 0; i < g_nfiles && i < FONT_FILES; i++)
+         if ((i < g_nsync || preloaded) && g_files[i].data && strcmp(g_files[i].path, path) == 0)
+             return SDL_RWFromConstMem(g_files[i].data, (int)g_files[i].size);
+     return SDL_RWFromFile(path, "rb");
+@@ -586,7 +586,7 @@
+     if (e->str)
+         unlink_entry(slot);
+     gfx_destroy_texture_later(e->tex);
+-    free(e->str);
++    SDL_free(e->str);
+     memset(e, 0, sizeof(*e));
+ 
+     char fitted[1100];
+@@ -726,9 +726,9 @@
+             lru = i;
+     }
+     wrap_entry *e = &g_wrap[lru];
+-    free(e->str);
++    SDL_free(e->str);
+     for (int j = 0; j < e->n; j++)
+-        free(e->lines[j]);
++        SDL_free(e->lines[j]);
+     memset(e, 0, sizeof(*e));
+     e->hash = h;
+     e->str = SDL_strdup(s);
+--- a/src/platform/devscript.c
++++ b/src/platform/devscript.c
+@@ -17,6 +17,9 @@
+ #ifndef __vita__
+ 
+ #include "devscript.h"
++#include "../app.h"
++#include "platform.h"
++#include "../gfx/gfx.h"
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -181,8 +184,29 @@
+         g_px0 = (float)a; g_py0 = (float)b;
+         g_px1 = (float)c; g_py1 = (float)d;
+         g_ptr_step = 1;
++    } else if (sscanf(l, "state %479s", arg) == 1) {
++        FILE *f = fopen(arg, "w");
++        if (f) {
++            fprintf(f, "tab=%d\ndepth=%d\nnp=%d\ntyping=%d\nplayback=%d\nuri=%s\nquery=%s\n",
++                    A.tab, app_depth(), A.np_open, A.typing, A.player.playback, app_view()->uri, app_view()->query);
++            fclose(f);
++        }
+     } else if (sscanf(l, "shot %479s", arg) == 1) {
+         snprintf(g_shot, sizeof(g_shot), "%s", arg);
++    } else if (strcmp(l, "background") == 0) {
++        platform_test_overlay(true);
++    } else if (strcmp(l, "foreground") == 0) {
++        platform_test_overlay(false);
++    } else if (sscanf(l, "capture %479s", arg) == 1) {
++        /* Test-only readback, including while simulated graphics are gated. */
++        snprintf(g_shot, sizeof(g_shot), "%s", arg);
++        devscript_after_render(gfx_renderer());
++    } else if (sscanf(l, "quitshot %479s", arg) == 1) {
++        snprintf(g_shot, sizeof(g_shot), "%s", arg);
++        SDL_Event event;
++        memset(&event, 0, sizeof(event));
++        event.type = SDL_QUIT;
++        SDL_PushEvent(&event);
+     } else if (strcmp(l, "quit") == 0) {
+         *quit = true;
+     } else {
+--- a/src/platform/platform.h
++++ b/src/platform/platform.h
+@@ -23,10 +23,20 @@
+ 
+ void platform_init(void);
+ void platform_shutdown(void);
++/* Best-effort song notification; numeric errors only in diagnostics. */
++int platform_notify_song(const char *title, const char *artist);
+ 
+ /* Called once per frame. `keep_awake` stops auto-suspend while audio plays.
+  * The system's own screen dimming is held off: the app dims it (power.c). */
+ void platform_frame(bool keep_awake);
++
++/* Poll on the UI thread. Audio/backend work continues independently. */
++void platform_poll_lifecycle(void);
++bool platform_graphics_allowed(void);
++#ifndef __vita__
++/* Desktop automation only: simulate the shell owning graphics/input. */
++void platform_test_overlay(bool overlaid);
++#endif
+ 
+ typedef enum screen_level { SCREEN_ON, SCREEN_DIM, SCREEN_OFF } screen_level;
+ /* Backlight: full (the user's brightness setting), dimmed, or off. Desktop
+--- a/src/platform/platform_desktop.c
++++ b/src/platform/platform_desktop.c
+@@ -5,6 +5,7 @@
+ #include <SDL.h>
+ #include <stdio.h>
+ 
++static bool g_graphics_allowed = true;
+ static char g_base[1024];
+ static char g_data[1024];
+ 
+@@ -20,14 +21,28 @@
+         snprintf(g_data, sizeof(g_data), "%s", override);
+         return;
+     }
+-    char *pref = SDL_GetPrefPath("VitaSpot", "VitaSpot");
++    char *pref = SDL_GetPrefPath("Vitafy", "Vitafy");
+     snprintf(g_data, sizeof(g_data), "%s", pref ? pref : "./");
+     SDL_free(pref);
+ }
+ 
+ void platform_shutdown(void) {}
++int platform_notify_song(const char *title, const char *artist)
++{
++    (void)title; (void)artist;
++    SDL_Log("Vitafy mock song notification");
++    return 0;
++}
+ 
+ void platform_frame(bool keep_awake) { (void)keep_awake; }
++
++void platform_poll_lifecycle(void) {}
++bool platform_graphics_allowed(void) { return g_graphics_allowed; }
++void platform_test_overlay(bool overlaid)
++{
++    g_graphics_allowed = !overlaid;
++    SDL_Log("test overlay=%d", overlaid);
++}
+ 
+ bool platform_is_vita(void) { return false; }
+ 
+--- a/src/platform/platform_vita.c
++++ b/src/platform/platform_vita.c
+@@ -4,6 +4,11 @@
+ #include "vam_backend.h"
+ 
+ #include <psp2/apputil.h>
++#include <psp2/notificationutil.h>
++#include <psp2/sysmodule.h>
++#include "../notifications.h"
++#include <psp2/appmgr.h>
++#include <psp2/ctrl.h>
+ #include <psp2/avconfig.h>
+ #include <psp2/io/fcntl.h>
+ #include <psp2/io/stat.h>
+@@ -26,6 +31,8 @@
+ #define PRIORITY_BACKGROUND 170
+ 
+ static bool g_swap_confirm;
++static bool g_notifications_loaded;
++static bool g_graphics_allowed = true;
+ static int power_callback_thread(SceSize args, void *argp);
+ 
+ void platform_init(void)
+@@ -48,6 +55,7 @@
+     memset(&init, 0, sizeof(init));
+     memset(&boot, 0, sizeof(boot));
+     sceAppUtilInit(&init, &boot);
++    g_notifications_loaded = sceSysmoduleLoadModule(SCE_SYSMODULE_NOTIFICATION_UTIL) >= 0;
+ 
+     int enter = SCE_SYSTEM_PARAM_ENTER_BUTTON_CROSS;
+     sceAppUtilSystemParamGetInt(SCE_SYSTEM_PARAM_ID_ENTER_BUTTON, &enter);
+@@ -61,18 +69,62 @@
+     sceIoMkdir(DATA_DIR, 0777);
+ }
+ 
++int platform_notify_song(const char *title, const char *artist)
++{
++    if (!g_notifications_loaded) return -1;
++    /* SDK explicitly requires a 0x410-byte text buffer. Normal apps do not
++       call BgAppInitialize. No history deletion or BGDL progress spoofing. */
++    SceWChar16 text[0x410 / sizeof(SceWChar16)] = {0};
++    char message[1024];
++    snprintf(message, sizeof(message), "Vitafy - Now playing\n%s\n%s", title, artist);
++    notifications_utf16(message, text, sizeof(text) / sizeof(text[0]));
++    return sceNotificationUtilSendNotification(text);
++}
++
+ void platform_shutdown(void)
+ {
++    /* A development shutdown must not leave the next app's panel dark. */
++    platform_set_screen(SCREEN_ON);
++    if (g_notifications_loaded)
++        sceSysmoduleUnloadModule(SCE_SYSMODULE_NOTIFICATION_UTIL);
++    g_notifications_loaded = false;
+     sceAppUtilShutdown();
+ }
+ 
+ void platform_frame(bool keep_awake)
+ {
++    if (!g_graphics_allowed)
++        return; /* Do not manage the shell's dimming/backlight policy. */
+     /* The app dims and turns off the screen itself (power.c). */
+     sceKernelPowerTick(SCE_KERNEL_POWER_TICK_DISABLE_OLED_DIMMING);
+     if (keep_awake)
+         sceKernelPowerTick(SCE_KERNEL_POWER_TICK_DISABLE_AUTO_SUSPEND);
+ }
++
++void platform_poll_lifecycle(void)
++{
++    SceAppMgrAppState state;
++    SceCtrlData pad;
++    memset(&state, 0, sizeof(state));
++    memset(&pad, 0, sizeof(pad));
++    /* Version zero is used by existing native VitaSDK callers. */
++    int rc = _sceAppMgrGetAppState(&state, sizeof(state), 0);
++    int controls = sceCtrlPeekBufferPositive(0, &pad, 1);
++    bool allowed = rc >= 0 && controls > 0 && !state.isSystemUiOverlaid &&
++                   !(pad.buttons & SCE_CTRL_INTERCEPTED);
++    if (allowed != g_graphics_allowed) {
++        char message[160];
++        snprintf(message, sizeof(message),
++                 "lifecycle graphics=%d appstate=%#x overlay=%d controls=%d intercepted=%d",
++                 allowed, rc, state.isSystemUiOverlaid, controls,
++                 !!(pad.buttons & SCE_CTRL_INTERCEPTED));
++        vam_log(message);
++    }
++    /* Unknown lifecycle/input state denies rendering until a valid sample. */
++    g_graphics_allowed = allowed;
++}
++
++bool platform_graphics_allowed(void) { return g_graphics_allowed; }
+ 
+ bool platform_is_vita(void) { return true; }
+ 
+--- a/src/screens/browse.c
++++ b/src/screens/browse.c
+@@ -46,7 +46,13 @@
+     ui_scroll_begin(&v->scroll, vp, v->content_h, AXIS_Y, true);
+     float y = CONTENT_Y + 22 - v->scroll.pos;
+     text_draw(greeting(), CONTENT_X + PAD, y, FS_XXL, FW_BOLD, rgb(C_TEXT), CONTENT_W - 2 * PAD);
+-    y += 52;
++    y += 46;
++    text_draw("Your music, on your Vita.", CONTENT_X+PAD, y, FS_S, FW_REGULAR, rgb(C_SUBTEXT), CONTENT_W-2*PAD);
++    y += 36;
++    if (pill_button(ui_id("home.search"), "Find music", CONTENT_X+PAD, y, false, NULL)) app_switch_tab(TAB_SEARCH);
++    if (pill_button(ui_id("home.library"), "Your Library", CONTENT_X+PAD+140, y, false, NULL)) app_switch_tab(TAB_LIBRARY);
++    if (pill_button(ui_id("home.queue"), "Queue", CONTENT_X+PAD+290, y, false, NULL)) app_open_uri("vam:queue");
++    y += 60;
+     sections_ctx c = { v, NULL, false, true, vp, CONTENT_X + PAD - ROW_INSET, CONTENT_W - 2 * PAD + 2 * ROW_INSET };
+     y = draw_sections(&c, v->page, 0, y);
+     v->content_h = y + v->scroll.pos - CONTENT_Y + 24;
+--- a/src/screens/login.c
++++ b/src/screens/login.c
+@@ -8,8 +8,7 @@
+ 
+ static void brand(float cy)
+ {
+-    gfx_rrect(rect(SCREEN_W / 2.0f - 32, cy - 32, 64, 64), 18, rgb(C_ACCENT));
+-    gfx_icon(ICON_NOTE, SCREEN_W / 2.0f, cy, 40, rgb(0x000000));
++    draw_vitafy_logo(SCREEN_W / 2.0f, cy, 72);
+ }
+ 
+ static void footer(void)
+@@ -33,7 +32,7 @@
+     ui_set_enabled(true);
+     gfx_vgradient(rect(0, 0, SCREEN_W, SCREEN_H), rgb(0x1B3A2A), rgb(C_BG));
+     brand(84);
+-    text_draw_aligned("VitaSpot", SCREEN_W / 2.0f, 126, FS_XXL, FW_BOLD, rgb(C_TEXT), 0, ALIGN_CENTER);
++    text_draw_aligned("Vitafy", SCREEN_W / 2.0f, 126, FS_XXL, FW_BOLD, rgb(C_TEXT), 0, ALIGN_CENTER);
+ 
+     const vam_auth_state *a = &A.auth;
+     const char *status;
+@@ -78,7 +77,7 @@
+     brand(110);
+     text_draw_aligned("Spotify Premium required", SCREEN_W / 2.0f, 168, FS_XXL, FW_BOLD, rgb(C_TEXT), 0,
+                       ALIGN_CENTER);
+-    text_draw_aligned("VitaSpot streams through Spotify Connect, which only works with Premium accounts.",
++    text_draw_aligned("Vitafy streams through Spotify Connect, which only works with Premium accounts.",
+                       SCREEN_W / 2.0f, 220, FS_M, FW_REGULAR, rgb(C_SUBTEXT), 800, ALIGN_CENTER);
+     char who[300];
+     snprintf(who, sizeof(who), "Signed in as %s",
+--- a/src/screens/player.c
++++ b/src/screens/player.c
+@@ -171,41 +171,50 @@
+ 
+ void screen_sidebar(void)
+ {
+-    static const char *const labels[TAB_COUNT] = { "Home", "Search", "Library", "Settings" };
+-    static const icon_id icons[TAB_COUNT][2] = {
+-        { ICON_HOME, ICON_HOME_FILLED },
+-        { ICON_SEARCH, ICON_SEARCH_BOLD },
+-        { ICON_LIBRARY, ICON_LIBRARY_BOLD },
+-        { ICON_SETTINGS, ICON_SETTINGS_BOLD },
+-    };
+-    gfx_rect(rect(0, 0, SIDEBAR_W, SCREEN_H - PLAYER_H), rgb(C_BG_DEEP));
+-
+-    /* The signed-in user's profile picture; until it loads (or without
+-       one), the app mark: a generic note glyph, not anyone's logo. */
+-    rectf mark = rect(SIDEBAR_W / 2.0f - 18, 16, 36, 36);
+-    SDL_Texture *avatar = images_get_round(A.auth.image_url, NULL);
+-    if (avatar) {
+-        gfx_image(avatar, mark, 255);
+-    } else {
+-        gfx_rrect(mark, 10, rgb(C_ACCENT));
+-        gfx_icon(ICON_NOTE, SIDEBAR_W / 2.0f, 34, 24, rgb(0x000000));
+-    }
+-
++    static const char *labels[TAB_COUNT] = { "Home", "Search", "Your Library", "Settings" };
++    static const icon_id icons[TAB_COUNT] = { ICON_HOME_FILLED, ICON_SEARCH, ICON_LIBRARY, ICON_SETTINGS };
++    gfx_rect(rect(0, 0, SIDEBAR_W, CONTENT_H), rgb(C_BG_DEEP));
++    draw_vitafy_logo(34, 34, 36);
++    text_draw_vc("Vitafy", 62, 34, FS_XL, FW_BOLD, rgb(C_TEXT), 130);
+     for (int i = 0; i < TAB_COUNT; i++) {
+-        rectf r = rect(6, 78 + i * 72.0f, SIDEBAR_W - 12, 64);
+-        ui_res res = ui_item(ui_idx(ui_id("tab"), i), r, 0);
++        rectf r = rect(8, 72 + i*54.0f, SIDEBAR_W-16, 48);
++        ui_res res = ui_item(ui_idx(ui_id("tab"),i), r, 0);
+         bool active = A.tab == i;
+-        color c = active ? rgb(C_TEXT) : rgb(res.pressed ? C_TEXT : C_SUBTEXT);
+-        if (res.focused)
+-            gfx_rrect(r, 8, rgb(C_SURFACE_HI));
+-        gfx_icon(icons[i][active], r.x + r.w / 2, r.y + 23, 26, c);
+-        text_draw_aligned(labels[i], r.x + r.w / 2, r.y + 40, FS_XS, active ? FW_BOLD : FW_REGULAR, c, r.w,
+-                          ALIGN_CENTER);
+-        if (res.focused)
+-            draw_focus_ring(r, 8);
+-        if (res.clicked)
+-            app_switch_tab(i);
+-    }
++        if (active || res.pressed || res.focused)
++            gfx_rrect(r, 7, rgb(active ? C_SURFACE_HI : C_SURFACE));
++        if (active) gfx_rrect(rect(8,r.y+12,3,24),1,rgb(C_ACCENT));
++        color c = rgb(active ? C_TEXT : C_SUBTEXT);
++        gfx_icon(icons[i], 34, r.y+24, 23, c);
++        text_draw_vc(labels[i], 58, r.y+24, FS_S, active ? FW_BOLD : FW_REGULAR, c, 136);
++        if (res.focused) draw_focus_ring(r,7);
++        if (res.clicked) app_switch_tab(i);
++    }
++    gfx_rect(rect(20,300,SIDEBAR_W-40,1),rgb(C_DIVIDER));
++    text_draw("YOUR MUSIC",20,316,FS_XS,FW_BOLD,rgb(C_MUTED),168);
++    ui_res liked = ui_item(ui_id("sidebar.liked"),rect(8,344,192,48),0);
++    if (liked.focused) draw_focus_ring(rect(8,344,192,48),7);
++    if (liked.clicked)
++    {
++        bool found = false;
++        for (int tab = 0; tab < TAB_COUNT && !found; tab++) {
++            model_page *page = A.stacks[tab][0].page;
++            if (!page) continue;
++            for (uint32_t j = 0; j < page->section_count && !found; j++)
++                for (uint32_t k = 0; k < page->sections[j].count && !found; k++) {
++                    vam_item *item = &page->sections[j].items[k];
++                    if (item->kind == VAM_KIND_COLLECTION) { app_open_uri(item->uri); found = true; }
++                }
++        }
++        if (!found) { app_switch_tab(TAB_LIBRARY); app_toast("Open Liked Songs from Your Library."); }
++    }
++    gfx_icon(ICON_HEART,34,368,21,rgb(C_ACCENT));
++    text_draw_vc("Liked Songs",58,368,FS_S,FW_REGULAR,rgb(C_TEXT),134);
++    ui_res queue = ui_item(ui_id("sidebar.queue"),rect(8,396,192,48),0);
++    if (queue.focused) draw_focus_ring(rect(8,396,192,48),7);
++    if (queue.clicked)
++        app_open_uri("vam:queue");
++    gfx_icon(ICON_QUEUE,34,420,21,rgb(C_SUBTEXT));
++    text_draw_vc("Play queue",58,420,FS_S,FW_REGULAR,rgb(C_SUBTEXT),134);
+ }
+ 
+ /* Text wider than max_w scrolls sideways: it rests at the start, scrolls
+@@ -395,6 +404,6 @@
+         text_draw_vc("Playing on another device", x0 + 30, oy + 462, FS_S, FW_BOLD, rgb(C_ACCENT), w);
+     }
+ 
+-    text_draw_aligned("VitaSpot is an unofficial Spotify client.", SCREEN_W / 2.0f, oy + SCREEN_H - 28, FS_XS,
++    text_draw_aligned("Vitafy is an unofficial Spotify client.", SCREEN_W / 2.0f, oy + SCREEN_H - 28, FS_XS,
+                       FW_REGULAR, rgb(C_MUTED), SCREEN_W - 40, ALIGN_CENTER);
+ }
+--- a/src/screens/sections.c
++++ b/src/screens/sections.c
+@@ -155,8 +155,13 @@
+     /* Page in more rows as the end approaches (first section only). */
+     if (si == 0 && model_has_more(c->v->page)) {
+         float bottom = c->viewport.y + c->viewport.h;
+-        if (y < bottom + 900)
++        if (y < bottom + 900 && !c->v->more_failed)
+             app_request_more(c->v);
++        if (c->v->more_failed) {
++            if (pill_button(ui_id("page.more.retry"), "Retry loading more", c->x + ROW_INSET, y + 8, false, NULL))
++                app_request_more(c->v);
++            y += 56;
++        }
+         if (c->v->more_req) {
+             gfx_spinner(c->x + c->w / 2, y + 24, 12, A.time, rgb(C_SUBTEXT));
+             y += 48;
+--- a/src/screens/settings.c
++++ b/src/screens/settings.c
+@@ -197,7 +197,7 @@
+ {
+     rectf card = rect(x, y, w, 96);
+     gfx_rrect(card, 8, rgb(C_SURFACE));
+-    text_draw("VitaSpot", card.x + 16, card.y + 20, FS_M, FW_BOLD, rgb(C_TEXT), card.w - 32);
++    text_draw("Vitafy", card.x + 16, card.y + 20, FS_M, FW_BOLD, rgb(C_TEXT), card.w - 32);
+     text_draw_aligned("Version " VAM_APP_VERSION, card.x + card.w - 16, card.y + 22, FS_S, FW_REGULAR,
+                       rgb(C_SUBTEXT), 0, ALIGN_RIGHT);
+     text_draw("An unofficial Spotify client for the PS Vita. Not affiliated with Spotify.", card.x + 16,
+@@ -221,6 +221,8 @@
+     float x = CONTENT_X + PAD, w = CONTENT_W - 2 * PAD;
+     float y = CONTENT_Y + 22 - v->scroll.pos;
+     text_draw("Settings", x, y, FS_XXL, FW_BOLD, rgb(C_TEXT), w);
++    if (pill_button(ui_id("settings.exit"), "Exit Vitafy", x+w-124, y, false, NULL))
++        A.quit = true; /* normal app_shutdown joins the playback backend */
+     y += 68;
+ 
+     text_draw("Account", x, y, FS_L, FW_BOLD, rgb(C_TEXT), w);
+@@ -235,6 +237,14 @@
+     y += 38;
+     y += audio_card(x, y, w) + 32;
+ 
++    text_draw("Notifications", x, y, FS_L, FW_BOLD, rgb(C_TEXT), w);
++    y += 38;
++    text_draw("Show song and artist when the track changes", x, y, FS_S, FW_REGULAR, rgb(C_SUBTEXT), w-100);
++    if (pill_button(ui_id("settings.notifications"), prefs_get()->notifications ? "On" : "Off", x+w-80, y-8, prefs_get()->notifications, NULL)) {
++        prefs_get()->notifications = !prefs_get()->notifications;
++        prefs_changed();
++    }
++    y += 68;
+     text_draw("About", x, y, FS_L, FW_BOLD, rgb(C_TEXT), w);
+     y += 38;
+     y += about_card(x, y, w);
+--- a/src/screens/widgets.c
++++ b/src/screens/widgets.c
+@@ -4,6 +4,26 @@
+ #include "../gfx/images.h"
+ #include "../gfx/text.h"
+ #include "../theme.h"
++
++void draw_vitafy_logo(float cx, float cy, float size)
++{
++    float s = size / 100.0f;
++    color ink = rgb(0x08130C);
++    gfx_circle(cx, cy, size / 2, rgb(C_ACCENT));
++    for (int row = 0; row < 3; row++) {
++        float w = 25 - row * 3, y = cy + (-16 + row * 12) * s;
++        for (int i = 0; i < 20; i++) {
++            float x0 = -w + 2*w*i/20, x1 = -w + 2*w*(i+1)/20;
++            gfx_line(cx+x0*s, y+(x0*x0/100)*s, cx+x1*s, y+(x1*x1/100)*s, (5-row*.5f)*s, ink);
++        }
++    }
++    gfx_line(cx-34*s,cy+16*s,cx-20*s,cy+16*s,4*s,ink);
++    gfx_line(cx-27*s,cy+9*s,cx-27*s,cy+23*s,4*s,ink);
++    gfx_circle(cx+27*s,cy+10*s,2.7f*s,ink);
++    gfx_circle(cx+34*s,cy+17*s,2.7f*s,ink);
++    gfx_circle(cx+20*s,cy+17*s,2.7f*s,ink);
++    gfx_circle(cx+27*s,cy+24*s,2.7f*s,ink);
++}
+ 
+ void fmt_duration(uint32_t ms, char *buf, size_t n)
+ {
+--- a/backend/librespot-vam/src/platform/vita.rs
++++ b/backend/librespot-vam/src/platform/vita.rs
+@@ -91,6 +91,9 @@
+ }
+ 
+ extern "C" {
++    fn sceAppMgrAcquireBgmPort() -> c_int;
++    fn sceAppMgrReleaseBgmPort() -> c_int;
++    fn sceKernelPowerTick(kind: c_int) -> c_int;
+     fn sceAudioOutOpenPort(port_type: c_int, len: c_int, freq: c_int, mode: c_int) -> c_int;
+     fn sceAudioOutReleasePort(port: c_int) -> c_int;
+     fn sceAudioOutOutput(port: c_int, buf: *const c_void) -> c_int;
+@@ -319,6 +322,7 @@
+     stop: Arc<AtomicBool>,
+     thread: Option<JoinHandle<()>>,
+     port: c_int,
++    bgm_acquired: bool,
+ }
+ 
+ impl VitaSink {
+@@ -332,6 +336,7 @@
+             stop: Arc::new(AtomicBool::new(false)),
+             thread: None,
+             port: -1,
++            bgm_acquired: false,
+         }
+     }
+ 
+@@ -370,10 +375,25 @@
+             ring.bytes.clear();
+         }
+         if self.port < 0 {
++            // A BGM-type audio port alone does not acquire AppMgr's right
++            // to remain audible after the app leaves the foreground.
++            let rc = unsafe { sceAppMgrAcquireBgmPort() };
++            if rc >= 0 {
++                self.bgm_acquired = true;
++                log::info!("background audio ownership acquired");
++            } else {
++                // Preserve foreground playback if another application owns
++                // the slot. Do not forcefully evict another process.
++                log::warn!("background audio ownership unavailable: {rc:#x}");
++            }
+             // SCE_AUDIO_OUT_PORT_TYPE_BGM = 1, SCE_AUDIO_OUT_MODE_STEREO = 1,
+             // 44100 Hz signed 16 bit.
+             let port = unsafe { sceAudioOutOpenPort(1, GRAIN_FRAMES, 44100, 1) };
+             if port < 0 {
++                if self.bgm_acquired {
++                    unsafe { sceAppMgrReleaseBgmPort() };
++                    self.bgm_acquired = false;
++                }
+                 return Err(SinkError::NotConnected(format!(
+                     "sceAudioOutOpenPort failed: {port:#x}"
+                 )));
+@@ -391,11 +411,16 @@
+             let ring = Arc::clone(&self.ring);
+             let stop = Arc::clone(&self.stop);
+             let port = self.port;
+-            let handle = std::thread::Builder::new()
++            let handle = match std::thread::Builder::new()
+                 .name("vam-audio-out".into())
+                 .stack_size(256 * 1024)
+-                .spawn(move || audio_thread(port, ring, stop))
+-                .map_err(|e| SinkError::NotConnected(e.to_string()))?;
++                .spawn(move || audio_thread(port, ring, stop)) {
++                Ok(handle) => handle,
++                Err(error) => {
++                    let _ = self.stop();
++                    return Err(SinkError::NotConnected(error.to_string()));
++                }
++            };
+             self.thread = Some(handle);
+         }
+         Ok(())
+@@ -416,6 +441,14 @@
+             unsafe { sceAudioOutReleasePort(self.port) };
+             log::info!("audio port released: {}", self.port);
+             self.port = -1;
++        }
++        if self.bgm_acquired {
++            let rc = unsafe { sceAppMgrReleaseBgmPort() };
++            if rc < 0 {
++                log::warn!("releasing background audio ownership failed: {rc:#x}");
++            }
++            self.bgm_acquired = false;
++            log::info!("background audio ownership released");
+         }
+         Ok(())
+     }
+@@ -455,6 +488,12 @@
+     }
+ }
+ 
++impl Drop for VitaSink {
++    fn drop(&mut self) {
++        let _ = <Self as Sink>::stop(self);
++    }
++}
++
+ fn audio_thread(port: c_int, ring: Arc<(Mutex<RingState>, Condvar)>, stop: Arc<AtomicBool>) {
+     set_current_thread_priority(PRIORITY_AUDIO, "audio thread");
+     let need = GRAIN_FRAMES as usize * BYTES_PER_FRAME;
+@@ -463,9 +502,18 @@
+     // decoder could not keep up. Heard as dropouts or crackles.
+     let mut started = false;
+     let mut underruns: u32 = 0;
++    let mut next_power_tick = std::time::Instant::now();
+     loop {
+         if stop.load(Ordering::SeqCst) {
+             break;
++        }
++        let now = std::time::Instant::now();
++        if now >= next_power_tick {
++            // SCE_KERNEL_POWER_TICK_DISABLE_AUTO_SUSPEND = 1 in VitaSDK.
++            // The UI may be blocked in presentation while deactivated, so
++            // playback must keep its own inactivity timer alive.
++            unsafe { sceKernelPowerTick(1) };
++            next_power_tick = now + std::time::Duration::from_secs(1);
+         }
+         {
+             let (lock, condvar) = &*ring;

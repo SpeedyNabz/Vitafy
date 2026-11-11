@@ -1,0 +1,46 @@
+{
+  "scope": "Historical lab build; standalone build validation is recorded separately",
+  "version": "0.1.0-preview.1",
+  "vpk_sha256": "5f596f3baf00c99b79e27b6935a5e96d83f983064c2bf1d7a6207ea18056d038",
+  "elf_sha256": "c27bfd923234048c076461e3b8c5b3f916be5261516e7d4dc1089c93e54fc5be",
+  "velf_sha256": "462fbcda56bdfd61a06edcb1b4fdafb968b2051b1ea6bf10358a463b28d30a88",
+  "backend_sha256": "71a7f505f9087e90b5b39b703251c9f4be6270771a9449621328e1ab018de5f0",
+  "package": {
+    "sfo": {
+      "APP_VER": "01.14",
+      "ATTRIBUTE": 32768,
+      "ATTRIBUTE2": 0,
+      "ATTRIBUTE_MINOR": 16,
+      "BOOT_FILE": "",
+      "CATEGORY": "gd",
+      "CONTENT_ID": "",
+      "EBOOT_APP_MEMSIZE": 0,
+      "EBOOT_ATTRIBUTE": 0,
+      "EBOOT_PHY_MEMSIZE": 0,
+      "LAREA_TYPE": 0,
+      "NP_COMMUNICATION_ID": "",
+      "PARENTAL_LEVEL": 1,
+      "PSP2_DISP_VER": "00.000",
+      "PSP2_SYSTEM_VER": 0,
+      "STITLE": "Vitafy",
+      "TITLE": "Vitafy",
+      "TITLE_ID": "VTAM00001",
+      "VERSION": "00.00"
+    },
+    "archive_entries": 12,
+    "crc": "passed",
+    "private_data_check": "passed"
+  },
+  "native_imports": "verified",
+  "host_assertions": [
+    "search entry and results",
+    "library navigation",
+    "account-derived Liked Songs URI",
+    "Now Playing",
+    "queue",
+    "overlay freezes drawing",
+    "foreground resumes drawing",
+    "quit draws no extra frame"
+  ],
+  "hardware": "pending"
+}
