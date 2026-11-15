@@ -1,0 +1,50 @@
+{
+  "date": "2026-11-15",
+  "version": "0.1.0-preview.2",
+  "backend_api_version": 4,
+  "source_lock_sha256": "1b213bf091ad2ff5078fc91e2005372e4e6cd6915635e85fe419e52b1f28aa2a",
+  "host_exit_codes": {
+    "desktop-final": 0,
+    "rust-final": 0
+  },
+  "ctest": "5/5 passed",
+  "real_backend_unit_tests": "12/12 passed",
+  "frontend": {
+    "status": "passed",
+    "scope": "offline mock UI; no Spotify login or audio",
+    "assertions": [
+      "persistent sidebar opens playlist",
+      "playlist title sort control",
+      "search entry and results",
+      "library navigation",
+      "account-derived Liked Songs URI",
+      "Now Playing",
+      "queue",
+      "overlay freezes drawing",
+      "foreground resumes drawing",
+      "quit draws no extra frame"
+    ],
+    "executable_sha256": "a235b8f1f63526c54589196ecd14e7fff7e3210c7cae704a385765a778c2bafe"
+  },
+  "library_sync": {
+    "status": "passed",
+    "scope": "offline frontend/mock; no Spotify account or audio",
+    "assertions": [
+      "playlist/player like sync",
+      "Now Playing unlike sync",
+      "pending heart survives stale snapshots",
+      "external like/unlike propagation",
+      "failed write rollback",
+      "scoped filtering",
+      "back/forward retains filter",
+      "acknowledged playlist creation refreshes library",
+      "library grid and compact grid"
+    ]
+  },
+  "hardware": "pending",
+  "live_spotify_requests": "none executed",
+  "log_sha256": {
+    "desktop-final.log": "5d0452188905fad6402d44314b84ee7411e92ba849e44ce85f5be1c47c68d5a9",
+    "rust-final.log": "80062918435ba6ef05ef5a231c216953c8224ee5651fb7824f9cfe096d603852"
+  }
+}

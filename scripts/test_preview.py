@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import subprocess
+import tempfile
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -12,13 +13,23 @@ ROOT = Path(__file__).resolve().parent.parent
 def main():
     out = ROOT / "artifacts/mock-preview"
     out.mkdir(parents=True, exist_ok=True)
-    data = ROOT / "build/smoke-data"
-    data.mkdir(exist_ok=True)
+    temporary_data = tempfile.TemporaryDirectory(prefix="vitafy-preview-")
+    data = Path(temporary_data.name)
     script = out / "smoke.txt"
     script.write_text("""wait 800
 shot home.bmp
 state home.txt
-click 34 150
+click 80 306
+wait 500
+shot playlist.bmp
+state playlist.txt
+click 820 280
+wait 200
+click 780 210
+wait 200
+shot sorted.bmp
+state sorted.txt
+click 34 128
 wait 200
 click 400 35
 wait 150
@@ -28,15 +39,15 @@ key Return
 wait 600
 shot search.bmp
 state search.txt
-click 34 204
+click 34 176
 wait 600
 shot library.bmp
 state library.txt
-click 34 368
+click 34 224
 wait 500
 shot liked.bmp
 state liked.txt
-click 255 270
+click 255 218
 wait 700
 key n
 wait 400
@@ -44,11 +55,11 @@ shot now-playing.bmp
 state now-playing.txt
 key n
 wait 400
-click 34 420
+click 140 27
 wait 600
 shot queue.bmp
 state queue.txt
-click 34 258
+click 184 27
 wait 400
 shot settings.bmp
 state settings.txt
@@ -74,6 +85,8 @@ quitshot forbidden.bmp
     def state(name):
         return dict(line.split("=", 1) for line in (out / (name + ".txt")).read_text().splitlines())
     assert state("home")["tab"] == "0"
+    assert state("playlist")["uri"].startswith("spotify:playlist:")
+    assert state("sorted")["sort"] == "1"
     assert state("search")["tab"] == "1" and state("search")["query"] == "ambient"
     assert state("library")["tab"] == "2"
     assert state("liked")["uri"].endswith(":collection") and state("liked")["depth"] == "2"
@@ -83,16 +96,15 @@ quitshot forbidden.bmp
     assert (out / "before.bmp").read_bytes() == (out / "during.bmp").read_bytes()
     assert (out / "after.bmp").read_bytes() != (out / "before.bmp").read_bytes()
     assert not forbidden.exists()
-    for name in ("home", "search", "library", "liked", "now-playing", "queue", "settings"):
+    for name in ("home", "playlist", "sorted", "search", "library", "liked", "now-playing", "queue", "settings"):
         with Image.open(out / (name + ".bmp")) as image:
             assert image.size == (960, 544)
             image.save(out / (name + ".png"))
     record = dict(status="passed", scope="offline mock UI; no Spotify login or audio",
-                  assertions=["search entry and results", "library navigation", "account-derived Liked Songs URI",
+                  assertions=["persistent sidebar opens playlist", "playlist title sort control", "search entry and results", "library navigation", "account-derived Liked Songs URI",
                               "Now Playing", "queue", "overlay freezes drawing", "foreground resumes drawing", "quit draws no extra frame"],
                   executable_sha256=hashlib.sha256(executable.read_bytes()).hexdigest(),
-                  source_sha256={p.relative_to(ROOT / "build/source").as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
-                                 for p in (ROOT / "build/source").rglob("*") if p.is_file() and ".git" not in p.parts})
+                  source_sha256=json.loads((ROOT/"source-lock.json").read_text())["prepared_file_sha256"])
     (out / "verification.json").write_text(json.dumps(record, indent=2) + "\n")
     print(json.dumps({k: v for k, v in record.items() if k != "source_sha256"}, indent=2))
 

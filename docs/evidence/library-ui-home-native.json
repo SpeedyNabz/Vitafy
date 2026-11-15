@@ -1,0 +1,53 @@
+{
+  "scope": "standalone native package; no device test",
+  "sdk": {
+    "rust_toolchain": "nightly-2026-10-18",
+    "target": "armv7-sony-vita-newlibeabihf",
+    "sdk_revision": "sdk-snapshot-20260825.611.1",
+    "sdk_channel": "2026.08",
+    "sdk_channel_sequence": "2026102473",
+    "sdk_package_release": "packages-2026.08-snapshot-20261024.61.1",
+    "sdk_core_version": "2026.08.1-1",
+    "sdk_installer_commit": "c9ba33bd428ba88052f79d78592f4b318a7a322b",
+    "sdk_status": "installed and native ARM build verified",
+    "configured_date": "2026-11-09",
+    "rust_compiler": "rustc 1.101.0-nightly (8006091eb 2026-10-17)",
+    "arm_c_compiler": "GCC 15.2.0"
+  },
+  "upstream": {
+    "name": "VitaSpot",
+    "repository": "https://github.com/0oPerryo0/VitaSpot.git",
+    "commit": "81c533f1ef61623360ea4fbe32cf29b4f2f3901f",
+    "version": "0.0.4"
+  },
+  "source_lock_sha256": "674523c70086802ab280c2263ff60d2bba3618c94e10290238860c5f31b1c8fa",
+  "backend_sha256": "71a7f505f9087e90b5b39b703251c9f4be6270771a9449621328e1ab018de5f0",
+  "backend_build": "reused verified archive",
+  "vpk_sha256": "0ee02e9c8bfdb067fce9eb65b82475aeb352ccf92b3aad482cca073643b5f5bd",
+  "elf_sha256": "5ac1d53ea54d86e4d291f250ccca9eea28dc2664d5d28a0a1d941d983c87fb28",
+  "velf_sha256": "dd2821aff047b944bb9fc3c7662f6b9e9696d72cc67c0a7212f8493fb1a18bc2",
+  "package": {
+    "APP_VER": "01.15",
+    "ATTRIBUTE": 32776,
+    "ATTRIBUTE2": 0,
+    "ATTRIBUTE_MINOR": 16,
+    "BOOT_FILE": "",
+    "CATEGORY": "gd",
+    "CONTENT_ID": "",
+    "EBOOT_APP_MEMSIZE": 0,
+    "EBOOT_ATTRIBUTE": 0,
+    "EBOOT_PHY_MEMSIZE": 0,
+    "LAREA_TYPE": 0,
+    "NP_COMMUNICATION_ID": "",
+    "PARENTAL_LEVEL": 1,
+    "PSP2_DISP_VER": "00.000",
+    "PSP2_SYSTEM_VER": 0,
+    "STITLE": "Vitafy",
+    "TITLE": "Vitafy",
+    "TITLE_ID": "VTAM00001",
+    "VERSION": "00.00"
+  },
+  "native_imports": "verified",
+  "hardware": "pending",
+  "lifecycle_profile": "Home experiment; game forced-close unsafe"
+}

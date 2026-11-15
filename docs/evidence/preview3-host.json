@@ -1,0 +1,61 @@
+{
+  "version": "0.1.0-preview.3",
+  "date": "2026-11-15",
+  "status": "passed",
+  "scope": "Windows host and offline synthetic UI; no Spotify account, audio or device",
+  "source_lock_sha256": "3d6c392cfce20f66319fd7bb11989dbaf7879fa672a045d73eb6fb63fbcfae11",
+  "upstream": {
+    "name": "VitaSpot",
+    "repository": "https://github.com/0oPerryo0/VitaSpot.git",
+    "commit": "81c533f1ef61623360ea4fbe32cf29b4f2f3901f",
+    "version": "0.0.4"
+  },
+  "sdk": {
+    "rust_toolchain": "nightly-2026-10-18",
+    "target": "armv7-sony-vita-newlibeabihf",
+    "sdk_revision": "sdk-snapshot-20260825.611.1",
+    "sdk_channel": "2026.08",
+    "sdk_channel_sequence": "2026102473",
+    "sdk_package_release": "packages-2026.08-snapshot-20261024.61.1",
+    "sdk_core_version": "2026.08.1-1",
+    "sdk_installer_commit": "c9ba33bd428ba88052f79d78592f4b318a7a322b",
+    "sdk_status": "installed and native ARM build verified",
+    "configured_date": "2026-11-09",
+    "rust_compiler": "rustc 1.101.0-nightly (8006091eb 2026-10-17)",
+    "arm_c_compiler": "GCC 15.2.0"
+  },
+  "backend_api_version": 5,
+  "ctest": {
+    "passed": 7,
+    "failed": 0,
+    "cases": [
+      "display_order",
+      "preferences",
+      "revision_edits",
+      "mock_premium",
+      "mock_login_transition",
+      "mock_free_account",
+      "notifications"
+    ]
+  },
+  "rust": {
+    "passed": 16,
+    "failed": 0,
+    "scope": "real Rust logic, offline"
+  },
+  "ui_suites": [
+    "test_preview.py",
+    "test_library_sync.py"
+  ],
+  "visual_checks": [
+    "scrollable entry menu",
+    "Vita-local pin indicator",
+    "confirmed removal refreshes 32 to 31 entries",
+    "description/header separation"
+  ],
+  "hardware": "pending",
+  "live_spotify_edits": "pending",
+  "live_host_like_sync": "pending",
+  "actual_lossless_delivery": "pending",
+  "preview_executable_sha256": "6cb3dfa67a89ad116b0cfff328e9e8cced1a0bfe9164efd80def59f9f7a9c1a0"
+}

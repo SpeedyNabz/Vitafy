@@ -1,0 +1,65 @@
+{
+  "version": "0.1.0-preview.7",
+  "status": "passed",
+  "scope": "Windows frontend/mock and real Rust host tests; no Spotify audio or device test",
+  "source_lock_sha256": "481154b6837afb19f08bca9bc86a38eaa44e6a5ef57026c8b82c337a64e3436b",
+  "upstream": {
+    "name": "VitaSpot",
+    "repository": "https://github.com/0oPerryo0/VitaSpot.git",
+    "commit": "81c533f1ef61623360ea4fbe32cf29b4f2f3901f",
+    "version": "0.0.4"
+  },
+  "sdk": {
+    "rust_toolchain": "nightly-2026-10-18",
+    "target": "armv7-sony-vita-newlibeabihf",
+    "sdk_revision": "sdk-snapshot-20260825.611.1",
+    "sdk_channel": "2026.08",
+    "sdk_channel_sequence": "2026102473",
+    "sdk_package_release": "packages-2026.08-snapshot-20261024.61.1",
+    "sdk_core_version": "2026.08.1-1",
+    "sdk_installer_commit": "c9ba33bd428ba88052f79d78592f4b318a7a322b",
+    "sdk_status": "installed and native ARM build verified",
+    "configured_date": "2026-11-09",
+    "rust_compiler": "rustc 1.101.0-nightly (8006091eb 2026-10-17)",
+    "arm_c_compiler": "GCC 15.2.0"
+  },
+  "ctest": {
+    "passed": 9,
+    "failed": 0
+  },
+  "ui_suites": [
+    "test_preview.py",
+    "test_library_sync.py",
+    "test_library_controls.py",
+    "test_search_keyboard.py",
+    "test_large_playback.py"
+  ],
+  "rust": {
+    "passed": 28,
+    "failed": 0,
+    "scope": "real pinned backend/cache/Connect code without credentials or network"
+  },
+  "ordered_counts": [
+    2048,
+    2049,
+    5000,
+    10000
+  ],
+  "real_connect_checks": [
+    "protobuf roundtrip with duplicates and selected positions",
+    "170 Next transitions, Previous and repeat wrapping",
+    "80 upcoming / 10 previous queue bounds"
+  ],
+  "cache_checks": [
+    "corruption/schema/account/expiry",
+    "backup recovery and failed writes",
+    "disk byte/file budgets and coalescing",
+    "old-session rejection",
+    "metadata LRU and unknown-field freshness",
+    "100 slices of shared immutable 5000-entry snapshot"
+  ],
+  "preview_executable_sha256": "7860b73614f6d81c51fe3e7dccdbd1c5e5594c09f688af022b2e9492aa1c3acd",
+  "hardware": "pending",
+  "device_performance": "not measured",
+  "live_service_writes": "not performed"
+}

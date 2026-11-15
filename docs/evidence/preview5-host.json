@@ -1,0 +1,61 @@
+{
+  "version": "0.1.0-preview.5",
+  "status": "passed",
+  "scope": "Windows host, synthetic UI and real Rust logic; no new physical-device test",
+  "source_lock_sha256": "03890a2eba1fb9f077fbc4c556a2d6e3ca1e0495098564681cb7aab47f4acad5",
+  "upstream": {
+    "name": "VitaSpot",
+    "repository": "https://github.com/0oPerryo0/VitaSpot.git",
+    "commit": "81c533f1ef61623360ea4fbe32cf29b4f2f3901f",
+    "version": "0.0.4"
+  },
+  "sdk": {
+    "rust_toolchain": "nightly-2026-10-18",
+    "target": "armv7-sony-vita-newlibeabihf",
+    "sdk_revision": "sdk-snapshot-20260825.611.1",
+    "sdk_channel": "2026.08",
+    "sdk_channel_sequence": "2026102473",
+    "sdk_package_release": "packages-2026.08-snapshot-20261024.61.1",
+    "sdk_core_version": "2026.08.1-1",
+    "sdk_installer_commit": "c9ba33bd428ba88052f79d78592f4b318a7a322b",
+    "sdk_status": "installed and native ARM build verified",
+    "configured_date": "2026-11-09",
+    "rust_compiler": "rustc 1.101.0-nightly (8006091eb 2026-10-17)",
+    "arm_c_compiler": "GCC 15.2.0"
+  },
+  "ctest": {
+    "passed": 8,
+    "failed": 0
+  },
+  "rust": {
+    "passed": 17,
+    "failed": 0
+  },
+  "ui_suites": [
+    "test_preview.py",
+    "test_library_sync.py",
+    "test_library_controls.py",
+    "test_search_keyboard.py"
+  ],
+  "keyboard": {
+    "status": "passed",
+    "scope": "same portable keyboard and settings code under desktop/mock; native acceptance pending",
+    "assertions": [
+      "touch key entry and commit",
+      "cancel preserves query",
+      "controller input and Back",
+      "timer defaults Never",
+      "Best/Medium/Low quality selection"
+    ]
+  },
+  "preview_executable_sha256": "820e8da36fd2fedab8f2333df356f48b1ceb9004c2c03642065bf15b850bb575",
+  "native_integration": "Native-only CMake source entry added after host checks; native build and link then passed.",
+  "hardware_search_fix": "pending",
+  "suspected_freeze_cause": "System keyboard overlay vs lifecycle rendering guard; inferred from code, not traced on hardware",
+  "timer_default": "Never for dim and off",
+  "quality_modes": [
+    "Best available (lossless first)",
+    "Medium <=160 kbps",
+    "Low <=96 kbps"
+  ]
+}

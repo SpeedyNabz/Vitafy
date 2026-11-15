@@ -1,0 +1,61 @@
+{
+  "scope": "standalone native package; no device test",
+  "sdk": {
+    "rust_toolchain": "nightly-2026-10-18",
+    "target": "armv7-sony-vita-newlibeabihf",
+    "sdk_revision": "sdk-snapshot-20260825.611.1",
+    "sdk_channel": "2026.08",
+    "sdk_channel_sequence": "2026102473",
+    "sdk_package_release": "packages-2026.08-snapshot-20261024.61.1",
+    "sdk_core_version": "2026.08.1-1",
+    "sdk_installer_commit": "c9ba33bd428ba88052f79d78592f4b318a7a322b",
+    "sdk_status": "installed and native ARM build verified",
+    "configured_date": "2026-11-09",
+    "rust_compiler": "rustc 1.101.0-nightly (8006091eb 2026-10-17)",
+    "arm_c_compiler": "GCC 15.2.0"
+  },
+  "upstream": {
+    "name": "VitaSpot",
+    "repository": "https://github.com/0oPerryo0/VitaSpot.git",
+    "commit": "81c533f1ef61623360ea4fbe32cf29b4f2f3901f",
+    "version": "0.0.4"
+  },
+  "source_lock_sha256": "481154b6837afb19f08bca9bc86a38eaa44e6a5ef57026c8b82c337a64e3436b",
+  "backend_sha256": "9e3355dd66be1e535cedc35ca5c1c97e12d61b05c315a3b8be19a5043a7b166c",
+  "backend_build": "fresh Cargo build",
+  "vpk_sha256": "2a61f68b02d29e1f1e6796318ae8386a99bdbc9d5a4ad3d37986efb16292f322",
+  "elf_sha256": "6d1de80dee8563a7db50341aa1fd3d99d075570413dc1bed71d2285c0f494860",
+  "velf_sha256": "19c7d8acfe22dfb97a8feac0f4e4041f52ec498fdc5dc8b41ca4f8037b9ea11e",
+  "package": {
+    "APP_VER": "01.29",
+    "ATTRIBUTE": 32776,
+    "ATTRIBUTE2": 0,
+    "ATTRIBUTE_MINOR": 16,
+    "BOOT_FILE": "",
+    "CATEGORY": "gd",
+    "CONTENT_ID": "",
+    "EBOOT_APP_MEMSIZE": 0,
+    "EBOOT_ATTRIBUTE": 0,
+    "EBOOT_PHY_MEMSIZE": 0,
+    "LAREA_TYPE": 0,
+    "NP_COMMUNICATION_ID": "",
+    "PARENTAL_LEVEL": 1,
+    "PSP2_DISP_VER": "00.000",
+    "PSP2_SYSTEM_VER": 0,
+    "STITLE": "Vitafy",
+    "TITLE": "Vitafy",
+    "TITLE_ID": "VTAM00001",
+    "VERSION": "00.00"
+  },
+  "native_imports": "verified",
+  "hardware": "pending",
+  "backend_api_version": 6,
+  "quality_policy": "Best: lossless first; Medium: <=160 kbps; Low: <=96 kbps; Vita PCM S16",
+  "debug_information": "frontend ELF/VELF and fresh Rust backend retained",
+  "lifecycle_profile": "Home experiment; game forced-close unsafe",
+  "debug_sections_verified": [
+    ".debug_info",
+    ".debug_line",
+    ".symtab"
+  ]
+}

@@ -1,0 +1,475 @@
+/* Sidebar, bottom player bar and the Now Playing overlay. */
+
+#include <math.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "../app.h"
+#include "../gfx/images.h"
+#include "../gfx/text.h"
+#include "../lyrics.h"
+#include "../prefs.h"
+#include "../theme.h"
+
+/* How long a lifted finger may stay off a slider before the drag commits. */
+#define SLIDER_RELEASE_GRACE_MS 120
+
+static float clamp01(float v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+
+/* hit_top > 0 keeps the touch area from reaching above that y, e.g. into
+   buttons right above the bar. */
+bool draw_slider(uint32_t id, rectf track, float *frac, float display_frac, float step, float hit_top)
+{
+    /* Tall touch area around a thin bar; nothing below the screen edge. */
+    float hit_y = track.y + track.h / 2 - SLIDER_HIT_H / 2.0f;
+    float hit_h = SLIDER_HIT_H;
+    if (hit_top > hit_y) {
+        hit_h -= hit_top - hit_y;
+        hit_y = hit_top;
+    }
+    if (hit_y + hit_h > SCREEN_H)
+        hit_h = SCREEN_H - hit_y;
+    rectf hit = rect(track.x - 8, hit_y, track.w + 16, hit_h);
+    ui_res res = ui_item(id, hit, UI_F_SLIDER);
+    bool committed = false;
+
+    if (A.slider_owner == 0 && ui_pointer_pressed_in(hit)) {
+        A.slider_owner = id;
+        A.slider_release_ms = 0;
+    }
+    if (A.slider_owner == id) {
+        uint64_t now = vam_now_ms();
+        if (ui_pointer_down() && (!A.slider_release_ms || ui_pointer_pressed_in(hit))) {
+            *frac = clamp01((ui_pointer_x() - track.x) / track.w);
+            A.slider_release_ms = 0;
+        } else if (!ui_pointer_down() && !A.slider_release_ms) {
+            /* The Vita panel can drop a finger for a frame or two mid-drag;
+               wait briefly so a flicker doesn't commit a seek. */
+            A.slider_release_ms = now ? now : 1;
+        } else if (ui_pointer_down() || now - A.slider_release_ms >= SLIDER_RELEASE_GRACE_MS) {
+            A.slider_owner = 0;
+            A.slider_release_ms = 0;
+            committed = true;
+        }
+    } else if (A.slider_owner == 0) {
+        /* Sliders that mirror each other (bar and Now Playing) share *frac,
+           so only reset it while nobody is dragging. */
+        *frac = display_frac;
+        if (res.slide) {
+            *frac = clamp01(display_frac + res.slide * step);
+            committed = true;
+        }
+    }
+
+    bool active = A.slider_owner == id || res.focused;
+    float f = clamp01(*frac);
+    gfx_rrect(track, track.h / 2, rgba(0xFFFFFF, 60));
+    gfx_rrect(rect(track.x, track.y, track.w * f, track.h), track.h / 2, active ? rgb(C_ACCENT) : rgb(0xFFFFFF));
+    if (active)
+        gfx_circle(track.x + track.w * f, track.y + track.h / 2, 7, rgb(0xFFFFFF));
+    if (res.focused)
+        draw_focus_ring(hit, 8);
+    return committed;
+}
+
+static void seek_slider(uint32_t id, rectf track, bool times_below, float time_y, float hit_top)
+{
+    uint32_t dur = A.player.track.duration_ms;
+    uint32_t pos = app_position_ms();
+    float display = dur ? (float)pos / dur : 0;
+    float step = dur ? 10000.0f / dur : 0;
+    bool committed = draw_slider(id, track, &A.scrub_frac, display, step, hit_top);
+    float shown = A.slider_owner == id ? A.scrub_frac : display;
+    if (committed && dur)
+        vam_seek((uint32_t)(A.scrub_frac * dur));
+
+    char a[16], b[16];
+    fmt_duration((uint32_t)(shown * dur), a, sizeof(a));
+    fmt_duration(dur, b, sizeof(b));
+    if (times_below) {
+        text_draw(a, track.x, time_y, FS_XS, FW_REGULAR, rgb(C_SUBTEXT), 0);
+        text_draw_aligned(b, track.x + track.w, time_y, FS_XS, FW_REGULAR, rgb(C_SUBTEXT), 0, ALIGN_RIGHT);
+    } else {
+        float cy = track.y + track.h / 2;
+        text_draw_aligned(a, track.x - 10, cy - text_line_height(FS_XS) / 2.0f, FS_XS, FW_REGULAR,
+                          rgb(C_SUBTEXT), 0, ALIGN_RIGHT);
+        text_draw(b, track.x + track.w + 10, cy - text_line_height(FS_XS) / 2.0f, FS_XS, FW_REGULAR,
+                  rgb(C_SUBTEXT), 0);
+    }
+}
+
+static void volume_slider(uint32_t id, rectf track)
+{
+    float display = A.player.volume / 65535.0f;
+    if (draw_slider(id, track, &A.vol_frac, display, 0.08f, 0))
+        vam_set_volume((uint16_t)(clamp01(A.vol_frac) * 65535));
+    else if (A.slider_owner == id)
+        vam_set_volume((uint16_t)(clamp01(A.vol_frac) * 65535));  /* live while dragging */
+}
+
+static void cycle_repeat(void)
+{
+    int next = A.player.repeat == VAM_REPEAT_OFF ? VAM_REPEAT_CONTEXT
+             : A.player.repeat == VAM_REPEAT_CONTEXT ? VAM_REPEAT_TRACK
+             : VAM_REPEAT_OFF;
+    vam_set_repeat(next);
+}
+
+static void toggle_play(void)
+{
+    if (app_is_playing())
+        vam_pause();
+    else
+        vam_resume();
+}
+
+/* Shuffle / prev / play / next / repeat, centred on cx. */
+static void transport(const char *prefix, float cx, float cy, float gap, float play_r, float icon)
+{
+    char id[48];
+    color on = rgb(C_ACCENT), off = rgb(C_SUBTEXT);
+
+    snprintf(id, sizeof(id), "%s.shuffle", prefix);
+    if (icon_button(ui_id(id), ICON_SHUFFLE, cx - gap * 2, cy, icon * 0.8f, icon + 16, A.player.shuffle ? on : off))
+        vam_set_shuffle(!A.player.shuffle);
+    if (A.player.shuffle)
+        gfx_circle(cx - gap * 2, cy + icon * 0.75f, 2, on);
+
+    snprintf(id, sizeof(id), "%s.prev", prefix);
+    if (icon_button(ui_id(id), ICON_PREV, cx - gap, cy, icon, icon + 16, rgb(C_TEXT)))
+        vam_prev();
+
+    snprintf(id, sizeof(id), "%s.play", prefix);
+    if (A.player.playback == VAM_PLAYBACK_BUFFERING) {
+        gfx_circle(cx, cy, play_r, rgb(0xFFFFFF));
+        gfx_spinner(cx, cy, play_r * 0.5f, A.time, rgb(0x000000));
+        if (ui_item(ui_id(id), rect(cx - play_r, cy - play_r, play_r * 2, play_r * 2), 0).clicked)
+            vam_pause();
+    } else if (round_button(ui_id(id), app_is_playing() ? ICON_PAUSE : ICON_PLAY, cx, cy, play_r, rgb(0xFFFFFF),
+                            rgb(0x000000))) {
+        toggle_play();
+    }
+
+    snprintf(id, sizeof(id), "%s.next", prefix);
+    if (icon_button(ui_id(id), ICON_NEXT, cx + gap, cy, icon, icon + 16, rgb(C_TEXT)))
+        vam_next();
+
+    snprintf(id, sizeof(id), "%s.repeat", prefix);
+    bool rep = A.player.repeat != VAM_REPEAT_OFF;
+    if (icon_button(ui_id(id), ICON_REPEAT, cx + gap * 2, cy, icon * 0.8f, icon + 16, rep ? on : off))
+        cycle_repeat();
+    if (rep)
+        gfx_circle(cx + gap * 2, cy + icon * 0.75f, 2, on);
+    if (A.player.repeat == VAM_REPEAT_TRACK) {
+        gfx_circle(cx + gap * 2 + icon * 0.4f, cy - icon * 0.4f, 6, on);
+        text_draw_aligned("1", cx + gap * 2 + icon * 0.4f, cy - icon * 0.4f - text_line_height(FS_XS) / 2.0f,
+                          FS_XS, FW_BOLD, rgb(0x000000), 0, ALIGN_CENTER);
+    }
+}
+
+/* ------------------------------------------------------------------------ */
+
+static bool sidebar_visible(const model_section *s,const vam_item *it)
+{
+    if(it->reserved&2)return true;
+    const char *parent=it->parent_uri;
+    for(int depth=0;parent[0]&&depth<16;depth++){
+        const vam_item *folder=NULL;
+        for(uint32_t i=0;i<s->count;i++)if(!strcmp(s->items[i].uri,parent)){folder=&s->items[i];break;}
+        if(!folder)break;
+        if(folder->reserved&4)return false;
+        parent=folder->parent_uri;
+    }
+    return true;
+}
+
+void screen_sidebar(void)
+{
+    static const char *labels[] = { "Home", "Search", "Your Library" };
+    static const icon_id icons[] = { ICON_HOME_FILLED, ICON_SEARCH, ICON_LIBRARY };
+    gfx_rect(rect(0, 0, SIDEBAR_W, CONTENT_H), rgb(C_BG_DEEP));
+    draw_vitafy_logo(26, 27, 30);
+    text_draw_vc("Vitafy", 48, 27, FS_L, FW_BOLD, rgb(C_TEXT), 80);
+    if (icon_button(ui_id("sidebar.queue"), ICON_QUEUE, 136, 27, 19, 48, rgb(C_SUBTEXT)))
+        app_open_uri("vam:queue");
+    if (icon_button(ui_idx(ui_id("tab"), TAB_SETTINGS), ICON_SETTINGS, 184, 27, 19, 48, rgb(C_SUBTEXT)))
+        app_switch_tab(TAB_SETTINGS);
+    for (int i = 0; i < 3; i++) {
+        rectf r = rect(8, 56 + i*48.0f, SIDEBAR_W-16, 48);
+        ui_res res = ui_item(ui_idx(ui_id("tab"),i), r, 0);
+        bool active = A.tab == i;
+        if (active || res.pressed || res.focused)
+            gfx_rrect(r, 7, rgb(active ? C_SURFACE_HI : C_SURFACE));
+        color col = rgb(active ? C_TEXT : C_SUBTEXT);
+        gfx_icon(icons[i], 30, r.y+24, 22, col);
+        text_draw_vc(labels[i], 54, r.y+24, FS_S, active ? FW_BOLD : FW_REGULAR, col, 142);
+        if (res.focused) draw_focus_ring(r,7);
+        if (res.clicked) app_switch_tab(i);
+    }
+    view *lib = &A.stacks[TAB_LIBRARY][0];
+    if (lib->saved_dirty && !lib->req) { lib->saved_dirty=false; if(lib->page) app_request_view(lib); }
+    if (!lib->page && !lib->req && !lib->failed) app_request_view(lib);
+    model_section *s = lib->page && lib->page->section_count ? &lib->page->sections[0] : NULL;
+    bool has_forward=A.depth[A.tab]<A.extent[A.tab];
+    float liked_width=has_forward?136:192;
+    ui_res liked = ui_item(ui_id("sidebar.liked"), rect(8,200,liked_width,48),0);
+    gfx_icon(ICON_HEART,30,224,21,rgb(C_ACCENT));
+    text_draw_vc("Liked Songs",54,224,FS_S,FW_REGULAR,rgb(C_TEXT),has_forward?92:142);
+    if (liked.focused) draw_focus_ring(rect(8,200,liked_width,48),7);
+    if (liked.clicked && s) {
+        for (uint32_t i = 0; i < s->count; i++)
+            if (s->items[i].kind == VAM_KIND_COLLECTION) { app_open_uri(s->items[i].uri); break; }
+    }
+    if (has_forward && icon_button(ui_id("sidebar.forward"),ICON_NEXT,170,224,20,48,rgb(C_SUBTEXT))) app_go_forward();
+    text_draw("YOUR LIBRARY",16,250,FS_XS,FW_BOLD,rgb(C_MUTED),112);
+    if (icon_button(ui_id("sidebar.sort"), ICON_MORE, 180, 254, 20, 40, rgb(C_SUBTEXT))) {
+        lib->sort_anchor=rect(0,254,200,40);lib->sort_open=true;lib->sort_scroll.pos=0;
+        lib->sort_focus=ui_focus();ui_set_focus(0);ui_reset_focus_list();
+    }
+    rectf vp = rect(0,280,SIDEBAR_W,CONTENT_H-280);
+    gfx_push_clip(vp);
+    ui_push_clip(vp);
+    const uint32_t *order = app_view_order(lib);
+    int count = 0;
+    if (s) for (uint32_t i = 0; i < s->count; i++)
+        if (app_library_matches(lib,&s->items[i]) && s->items[i].kind!=VAM_KIND_COLLECTION && sidebar_visible(s,&s->items[i])) count++;
+    ui_scroll_begin(&A.playlist_scroll,vp,count*52.0f+(lib->more_failed?56:8),AXIS_Y,true);
+    float y = vp.y - A.playlist_scroll.pos;
+    if (s) for (uint32_t row = 0; row < s->count; row++) {
+        uint32_t i = order ? order[row] : row;
+        vam_item *it = &s->items[i];
+        if(it->kind==VAM_KIND_COLLECTION || !app_library_matches(lib,it))continue;
+        if(!sidebar_visible(s,it))continue;
+        if(y+52<vp.y-104 || y>vp.y+vp.h+104){y+=52;continue;}
+        rectf r = rect(8,y,192,52);
+        ui_res res = ui_item(ui_idx(ui_id("sidebar.playlist"),i),r,0);
+        bool selected = strcmp(app_view()->uri,it->uri) == 0;
+        bool current = app_is_current_context(it->uri);
+        if (y+52 >= vp.y && y < vp.y+vp.h) {
+            if (selected || res.focused || res.pressed) gfx_rrect(r,5,rgb(C_SURFACE_HI));
+            draw_cover(it->image_url,rect(12,y+6,40,40),4,it->kind,it->title);
+            text_draw(it->title,60,y+7,FS_XS,FW_BOLD,rgb(current?C_ACCENT:C_TEXT),current?112:136);
+            if(it->reserved&2)text_draw("*",184,y+30,FS_XS,FW_BOLD,rgb(C_ACCENT),12);
+            text_draw(it->subtitle,60,y+28,FS_XS,FW_REGULAR,rgb(C_SUBTEXT),136);
+            if (current) gfx_equalizer(185,y+17,10,A.time,app_is_playing(),rgb(C_ACCENT));
+            if (res.focused) draw_focus_ring(r,5);
+        }
+        if(it->kind==VAM_KIND_FOLDER){
+            ui_res fold=ui_item(ui_idx(ui_id("sidebar.fold"),i),rect(8,y,44,52),0);
+            if(y+52>=vp.y && y<vp.y+vp.h)text_draw((it->reserved&4)?">":"v",24,y+15,FS_M,FW_BOLD,rgb(C_TEXT),24);
+            if(fold.clicked)prefs_item_toggle(A.auth.username,it->uri,16);
+        }
+        if (res.clicked) app_open_uri(it->uri);
+        if (res.menu) app_open_sheet(it,NULL,0);
+        y += 52;
+    }
+    if (lib->more_failed && pill_button(ui_id("sidebar.more.retry"),"Retry loading",16,y,false,NULL))
+        app_request_more(lib);
+    if (s && model_has_more(lib->page) && !lib->more_failed && y < vp.y+vp.h+52)
+        app_request_more(lib);
+    ui_scroll_end();
+    ui_pop_clip();
+    gfx_pop_clip();
+    if (!s) {
+        if (lib->failed) {
+            if (pill_button(ui_id("sidebar.retry"),"Retry",16,300,false,NULL)) app_request_view(lib);
+        } else text_draw("Loading library...",16,300,FS_XS,FW_REGULAR,rgb(C_SUBTEXT),180);
+    } else if (!count && !model_has_more(lib->page)) text_draw("No matching items",16,300,FS_XS,FW_REGULAR,rgb(C_SUBTEXT),180);
+}
+
+/* Text wider than max_w scrolls sideways: it rests at the start, scrolls
+   left while a second copy follows it in, then rests again. Each id starts
+   over from the left when its text changes. */
+#define MARQUEE_PAUSE 2.0f  /* seconds at rest */
+#define MARQUEE_SPEED 30.0f /* px per second */
+#define MARQUEE_GAP 56.0f   /* px between the copies */
+
+static void marquee_text(uint32_t id, const char *s, float x, float y, int size, font_weight w, color c,
+                         float max_w)
+{
+    int tw = text_width(s, size, w, 0);
+    if (tw <= max_w) {
+        text_draw(s, x, y, size, w, c, 0);
+        return;
+    }
+    static struct { uint32_t id; char text[VAM_TEXT_MAX]; float start; } slots[4];
+    int slot = 0;
+    for (int i = 0; i < 4; i++) {
+        if (slots[i].id == id || !slots[i].id) {
+            slot = i;
+            break;
+        }
+    }
+    if (slots[slot].id != id || strcmp(slots[slot].text, s) != 0) {
+        slots[slot].id = id;
+        snprintf(slots[slot].text, sizeof(slots[slot].text), "%s", s);
+        slots[slot].start = A.time;
+    }
+    float span = tw + MARQUEE_GAP;
+    float t = fmodf(A.time - slots[slot].start, MARQUEE_PAUSE + span / MARQUEE_SPEED);
+    float off = t < MARQUEE_PAUSE ? 0 : (t - MARQUEE_PAUSE) * MARQUEE_SPEED;
+    gfx_push_clip(rect(x, y - 4, max_w, text_line_height(size) + 8));
+    text_draw(s, x - off, y, size, w, c, 0);
+    if (off > 0)
+        text_draw(s, x - off + span, y, size, w, c, 0);
+    gfx_pop_clip();
+}
+
+void screen_player_bar(void)
+{
+    float y = SCREEN_H - PLAYER_H;
+    gfx_rect(rect(0, y, SCREEN_W, PLAYER_H), rgb(C_BG_DEEP));
+    gfx_rect(rect(0, y, SCREEN_W, 1), rgb(C_DIVIDER));
+    if (!A.player.has_track) {
+        text_draw_vc("Pick something to play", 20, y + PLAYER_H / 2.0f, FS_S, FW_REGULAR, rgb(C_MUTED), 300);
+        return;
+    }
+    const char *status = strstr(A.auth.message,"Wi-Fi is off") ? "Disconnected - reconnect Wi-Fi" :
+        A.auth.status != VAM_AUTH_LOGGED_IN ? "Connecting to Spotify" :
+        A.player.playback == VAM_PLAYBACK_BUFFERING ? "Buffering..." :
+        !A.player.is_active_device ? "Playing on another device" :
+        A.player.playback == VAM_PLAYBACK_PAUSED ? "Paused" : "";
+    text_draw_aligned(status,SCREEN_W-12,y+4,FS_XS,FW_REGULAR,rgb(C_SUBTEXT),250,ALIGN_RIGHT);
+    const vam_item *t = &A.player.track;
+
+    /* Left: art + title opens Now Playing. */
+    rectf left = rect(8, y + 8, 248, PLAYER_H - 16);
+    ui_res res = ui_item(ui_id("bar.track"), left, 0);
+    if (res.pressed || res.focused)
+        gfx_rrect(left, 6, rgb(C_SURFACE_HI));
+    draw_cover(t->image_url, rect(14, y + 16, 52, 52), 4, t->kind, t->title);
+    marquee_text(ui_id("bar.title"), t->title, 78, y + 20, FS_S, FW_BOLD, rgb(C_TEXT), 170);
+    text_draw(t->subtitle, 78, y + 44, FS_XS, FW_REGULAR, rgb(C_SUBTEXT), 170);
+    if (res.focused)
+        draw_focus_ring(left, 6);
+    if (res.clicked)
+        app_set_now_playing(true);
+
+    if (icon_button(ui_id("bar.like"), t->is_saved ? ICON_HEART : ICON_HEART_OUTLINE, 284, y + PLAYER_H / 2.0f,
+                    20, 48, t->is_saved ? rgb(C_ACCENT) : rgb(C_SUBTEXT)))
+        app_toggle_saved(t->uri, t->is_saved);
+
+    /* Centre: transport + seek. */
+    /* Transport hits end at y + 54, where the seek hit begins; the seek hit
+       then runs to the screen edge. */
+    transport("bar", 500, y + 30, 46, 20, 22);
+    seek_slider(ui_id("bar.seek"), rect(358, y + 66, 284, 4), false, 0, y + 54);
+
+    /* Right: device / queue / volume. */
+    if (!A.player.is_active_device)
+        gfx_icon(ICON_DEVICE, 712, y + PLAYER_H / 2.0f, 22, rgb(C_ACCENT));
+    if (icon_button(ui_id("bar.queue"), ICON_QUEUE, 752, y + PLAYER_H / 2.0f, 20, 48, rgb(C_SUBTEXT)))
+        app_open_uri("vam:queue");
+    gfx_icon(ICON_VOLUME, 794, y + PLAYER_H / 2.0f, 20, rgb(C_SUBTEXT));
+    volume_slider(ui_id("bar.volume"), rect(816, y + PLAYER_H / 2.0f - 2, 124, 4));
+}
+
+/* ------------------------------------------------------------------------ */
+
+void screen_now_playing(void)
+{
+    float t = A.np_anim;
+    float e = 1 - (1 - t) * (1 - t) * (1 - t);
+    float oy = (1 - e) * SCREEN_H;
+    const vam_item *tr = &A.player.track;
+
+    color target = rgb(0x404040);
+    images_get(tr->image_url, &target);
+    A.np_color = color_lerp(A.np_color, target, A.dt * 4 > 1 ? 1 : A.dt * 4);
+
+    gfx_rect(rect(0, oy, SCREEN_W, SCREEN_H), rgb(C_BG));
+    gfx_vgradient(rect(0, oy, SCREEN_W, SCREEN_H * 0.85f), color_scale(A.np_color, 1.1f), rgb(C_BG));
+    /* Block everything underneath. */
+    ui_item(ui_id("np.backdrop"), rect(0, oy, SCREEN_W, SCREEN_H), UI_F_NOFOCUS);
+
+    if (icon_button(ui_id("np.close"), ICON_CHEVRON_DOWN, 36, oy + 32, 28, 52, rgb(C_TEXT)))
+        app_set_now_playing(false);
+    char from[64];
+    const char *k = "";
+    if (strncmp(A.player.context_uri, "spotify:album:", 14) == 0) k = "ALBUM";
+    else if (strncmp(A.player.context_uri, "spotify:playlist:", 17) == 0) k = "PLAYLIST";
+    else if (strncmp(A.player.context_uri, "spotify:artist:", 15) == 0) k = "ARTIST";
+    else if (strstr(A.player.context_uri, "collection")) k = "YOUR LIBRARY";
+    if (A.player.context_title[0]) {
+        snprintf(from, sizeof(from), k[0] ? "PLAYING FROM %s" : "PLAYING FROM", k);
+        text_draw_aligned(from, SCREEN_W / 2.0f, oy + 12, FS_XS, FW_REGULAR, rgb(C_TEXT), 500, ALIGN_CENTER);
+        text_draw_aligned(A.player.context_title, SCREEN_W / 2.0f, oy + 32, FS_S, FW_BOLD, rgb(C_TEXT), 500,
+                          ALIGN_CENTER);
+    }
+    /* Lyrics toggle. Greyed out and inert while the track's lyrics are
+       loading or when it has none. */
+    bool has_lyrics = lyrics_available();
+    bool show_lyrics = has_lyrics && prefs_get()->lyrics;
+    if (has_lyrics) {
+        if (icon_button(ui_id("np.lyrics_toggle"), ICON_MIC, SCREEN_W - 148, oy + 32, 24, 52,
+                        show_lyrics ? rgb(C_ACCENT) : rgb(C_TEXT))) {
+            prefs_get()->lyrics = !prefs_get()->lyrics;
+            prefs_changed();
+        }
+    } else {
+        gfx_icon(ICON_MIC, SCREEN_W - 148, oy + 32, 24, with_alpha(rgb(C_TEXT), 0.3f));
+    }
+    if (icon_button(ui_id("np.queue"), ICON_QUEUE, SCREEN_W - 92, oy + 32, 24, 52, rgb(C_TEXT)))
+        app_open_uri("vam:queue");
+    if (icon_button(ui_id("np.more"), ICON_MORE, SCREEN_W - 36, oy + 32, 24, 52, rgb(C_TEXT)))
+        app_open_sheet(tr, A.player.context_uri, 0);
+
+    /* Artwork, or the lyrics in its place (fading in when switched on). */
+    static float lyrics_fade;
+    lyrics_fade = show_lyrics ? fminf(1, lyrics_fade + A.dt / ANIM_MED) : 0;
+    rectf art = rect(64, oy + 82, 360, 360);
+    if (show_lyrics) {
+        /* The current line sits level with the progress bar. */
+        lyrics_draw(art, oy + 262 + 2.5f, lyrics_fade);
+    } else {
+        gfx_shadow(art, 8, 22, 200);
+        draw_cover(tr->image_url, art, 8, tr->kind, tr->title);
+    }
+
+    /* Track info. With lyrics showing, the cover moves next to the title,
+       centred on the text from the title's top to the artist's bottom
+       (text_vmetrics). CJK glyphs reach higher and lower than Latin ones on
+       the same baseline, so that span is measured, once per title and artist. */
+    float x0 = 480, w = SCREEN_W - x0 - 56;
+    float tx = x0;
+    if (show_lyrics) {
+        static char measured[2 * VAM_TEXT_MAX + 2];
+        static float cover_mid = 186.5f; /* Latin, until the fonts can measure */
+        char key[sizeof(measured)];
+        snprintf(key, sizeof(key), "%s\n%s", tr->title, tr->subtitle);
+        float t_top, t_bottom, a_top, a_bottom;
+        if (strcmp(measured, key) != 0 && text_vmetrics(tr->title, FS_XXL, FW_BOLD, &t_top, &t_bottom) &&
+            text_vmetrics(tr->subtitle, FS_L, FW_REGULAR, &a_top, &a_bottom)) {
+            cover_mid = (150 + t_top + 196 + a_bottom) / 2;
+            memcpy(measured, key, sizeof(measured));
+        }
+        draw_cover(tr->image_url, rect(x0, oy + cover_mid - 30, 60, 60), 4, tr->kind, tr->title);
+        tx = x0 + 74;
+    }
+    float tw = w - 50 - (tx - x0);
+    marquee_text(ui_id("np.title"), tr->title, tx, oy + 150, FS_XXL, FW_BOLD, rgb(C_TEXT), tw);
+    rectf artist_r = rect(tx, oy + 192, tw, 32);
+    ui_res ar = ui_item(ui_id("np.artist"), artist_r, 0);
+    text_draw(tr->subtitle, tx, oy + 196, FS_L, FW_REGULAR, rgb(ar.pressed ? C_TEXT : C_SUBTEXT), tw);
+    if (ar.focused)
+        draw_focus_ring(artist_r, 4);
+    if (ar.clicked && tr->artist_uri[0])
+        app_open_uri(tr->artist_uri);
+    if (icon_button(ui_id("np.like"), tr->is_saved ? ICON_HEART : ICON_HEART_OUTLINE, x0 + w - 14, oy + 186, 26,
+                    52, tr->is_saved ? rgb(C_ACCENT) : rgb(C_TEXT)))
+        app_toggle_saved(tr->uri, tr->is_saved);
+
+    seek_slider(ui_id("np.seek"), rect(x0, oy + 262, w, 5), true, oy + 276, 0);
+    transport("np", x0 + w / 2, oy + 346, 72, 32, 30);
+
+    gfx_icon(ICON_VOLUME, x0 + 10, oy + 420, 20, rgb(C_SUBTEXT));
+    volume_slider(ui_id("np.volume"), rect(x0 + 36, oy + 418, w - 36, 4));
+
+    if (!A.player.is_active_device) {
+        gfx_icon(ICON_DEVICE, x0 + 10, oy + 462, 20, rgb(C_ACCENT));
+        text_draw_vc("Playing on another device", x0 + 30, oy + 462, FS_S, FW_BOLD, rgb(C_ACCENT), w);
+    }
+
+    text_draw_aligned("Vitafy is an unofficial Spotify client.", SCREEN_W / 2.0f, oy + SCREEN_H - 28, FS_XS,
+                      FW_REGULAR, rgb(C_MUTED), SCREEN_W - 40, ALIGN_CENTER);
+}

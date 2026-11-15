@@ -6,13 +6,15 @@ https://github.com/0oPerryo0/VitaSpot
 Baseline commit: `81c533f1ef61623360ea4fbe32cf29b4f2f3901f` (VitaSpot 0.0.4).
 The source lock and patch preserve this provenance. Source preparation fetches
 that revision into an ignored local directory; a full upstream source tree or
-compiled application is not bundled in this repository.
+compiled application is not committed in this repository. The 0.1.0 GitHub
+release separately provides the user-accepted Home binary.
 
 The inspected upstream root has no top-level LICENSE establishing a blanket
 frontend grant. Its backend Cargo manifest declares MIT, and vendored crates and
 fonts have their own notices. No blanket MIT or other license is assigned to
 upstream material or the entire application here. Clarification of frontend and
-asset redistribution terms remains outstanding before a public binary release.
+asset redistribution terms remains outstanding. Publishing the release does not
+resolve those terms or establish a blanket redistribution grant.
 
 The patch includes the previously reviewed allocator pairing fix, BGM ownership
 cleanup/keep-awake changes, bounded font-cache scan, graphics gating, and the new

@@ -48,9 +48,11 @@ python scripts/build.py desktop
 
 SDL archives are downloaded from the locked official release URLs and verified
 before extraction. CMake builds the real frontend against the mock backend.
-CTest runs Premium, delayed login, free-account rejection and notification tests.
+CTest runs display-order/snapshot, Premium, delayed login, free-account rejection and notification tests.
 The UI exercise verifies search/library/Liked Songs/Now Playing/queue navigation,
-simulated overlay drawing suspension, foreground return and quit behavior.
+simulated overlay drawing suspension, foreground return and quit behavior. A second
+exercise covers likes, rollback, external changes, scoped filters, history, private
+playlist creation and grid layouts using the offline mock.
 
 To explore without audio:
 
@@ -86,23 +88,53 @@ python scripts/build.py vita --sdk /path/to/vitasdk
 `--locked` and `-Z build-std`, compiles the newlib/POSIX shim, finds ring's assembly
 archive, and cross-compiles the frontend as RelWithDebInfo. It validates SFO,
 SELF/CRC, package art and native audio/notification imports before copying the VPK
-and hashes into `artifacts/Vitafy-0.1.0-preview.1/`. ELF/VELF remain in `build/native/`.
-The imported historical Rust archive itself has release debug stripping; retaining
-frontend symbols does not restore missing backend debug information.
+and hashes into `artifacts/Vitafy-0.1.0-preview.7/`. ELF/VELF remain in `build/native/`.
+The fresh backend now preserves release debug information as well. Cargo's active
+build-script record selects the matching ring assembly archive when multiple
+profile variants exist. Source reconstruction, native linking and packaging have
+been executed; actual audio and shell stability remain device checks.
 
-For reproducing the tested frontend/package using an already-built backend:
+ABI v6 adds cancellable chunked ordered uploads, stale-page flags, browse-cache
+controls and resource metrics to entry identity/page ownership, playlist
+and revision-aware entry/queue edit exports. The historical `--reuse-backend` ABI v3 archive is rejected for this
+source; use the normal fresh Cargo build. No Spotify login is required to build.
+
+## Experimental Home playback profile
 
 ```sh
-python scripts/build.py vita --sdk /path/to/vitasdk --reuse-backend --backend-dir /path/to/librespot-vam
+python scripts/build.py vita --sdk /path/to/vitasdk --home-playback
 ```
 
-This mode is read-only with respect to that backend directory and accepts only
-the exact recorded historical archive hash. The directory must also contain its
-ring assembly archive. The standalone native check used this mode; a fresh Rust
-backend rebuild under the new wrapper is separately pending. No successful build
-is a device playback or shell-stability result.
+This uses a separate `build/native-home/` and
+`artifacts/Vitafy-0.1.0-preview.7-home-experimental/`, install version 01.29 and
+ATTRIBUTE=32776. Debug ELF/VELF are retained. The default foreground build keeps
+01.30 / ATTRIBUTE=32768. The Home profile reuses the historical no-suspend flag
+and existing graphics lifecycle gate; device acceptance is pending. Do not accept
+a game-triggered forced-close prompt during playback: that transition previously
+hung the shell. Pause and use Settings → Exit before opening another app.
+Foreground 01.30 can replace Home 01.29. Switching back to Home after installing
+01.30 requires a newly versioned Home build; choose your profile before installation.
 
 Build tools may emit the installed SDK's existing `crtn.o` GNU-stack warning.
 No warning-free or memory-safety audit is claimed. Original lab inputs and the
 standalone repack have separate artifact hashes because target names, shim debug
 information and build paths differ.
+
+## Real backend host checks
+
+```sh
+cargo +nightly-2026-10-18 test --offline --lib --manifest-path build/source/backend/librespot-vam/Cargo.toml
+```
+
+This runs real Rust logic tests without credentials or Spotify network requests.
+It is separate from the C/frontend mock checks. Dependencies must already be
+cached for `--offline`. The current suite has 28 tests, including source-quality
+priority, saved-cache consistency, account epochs, metadata preservation, duplicate-safe playlist edits and queue
+context preservation, persistent cache recovery/budgets and real large-context
+serialization/rolling windows. Five frontend UI suites include 5,000-song loading
+and explicit order fallback. Nine CTest cases cover host contracts and preferences.
+
+When deliberately editing canonical overlays, review changes, then run
+`python scripts/refresh_sources.py --accept-overlay-edits` to update their lock
+hashes and refresh the generated tree. Ordinary builds only verify hashes; they
+do not silently accept edits. Never use the generated source as the canonical copy.

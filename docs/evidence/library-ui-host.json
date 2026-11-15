@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "scope": "offline mock UI; no Spotify login or audio",
+  "assertions": [
+    "persistent sidebar opens playlist",
+    "playlist title sort control",
+    "search entry and results",
+    "library navigation",
+    "account-derived Liked Songs URI",
+    "Now Playing",
+    "queue",
+    "overlay freezes drawing",
+    "foreground resumes drawing",
+    "quit draws no extra frame"
+  ],
+  "executable_sha256": "09b95fb96c1411ddbeec06b0608fb4e385d7a3166573dc755c7c5717abfb6273",
+  "date": "2026-11-15",
+  "ctest": "5/5 passed: display_order, mock_premium, mock_login_transition, mock_free_account, notifications"
+}

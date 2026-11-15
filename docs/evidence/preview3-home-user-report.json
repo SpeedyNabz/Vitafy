@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-15",
+  "version": "0.1.0-preview.3",
+  "profile": "Home experimental 01.21",
+  "evidence_type": "user report",
+  "observation": "The Home version works as intended; playback still works on the Home screen.",
+  "agent_device_test": false,
+  "not_established": [
+    "preview.4 always-on display behavior",
+    "FLAC source delivery",
+    "game-triggered forced-close safety",
+    "true sleep"
+  ]
+}

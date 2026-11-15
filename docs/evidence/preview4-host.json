@@ -1,0 +1,71 @@
+{
+  "date": "2026-11-15",
+  "version": "0.1.0-preview.4",
+  "status": "passed",
+  "scope": "Windows host; offline synthetic UI and real Rust logic; no new device test",
+  "source_lock_sha256": "8a8349e928cded439b7e589bc6d04d1fc659eda9992480c3b3cece9b957e8de0",
+  "upstream": {
+    "name": "VitaSpot",
+    "repository": "https://github.com/0oPerryo0/VitaSpot.git",
+    "commit": "81c533f1ef61623360ea4fbe32cf29b4f2f3901f",
+    "version": "0.0.4"
+  },
+  "sdk": {
+    "rust_toolchain": "nightly-2026-10-18",
+    "target": "armv7-sony-vita-newlibeabihf",
+    "sdk_revision": "sdk-snapshot-20260825.611.1",
+    "sdk_channel": "2026.08",
+    "sdk_channel_sequence": "2026102473",
+    "sdk_package_release": "packages-2026.08-snapshot-20261024.61.1",
+    "sdk_core_version": "2026.08.1-1",
+    "sdk_installer_commit": "c9ba33bd428ba88052f79d78592f4b318a7a322b",
+    "sdk_status": "installed and native ARM build verified",
+    "configured_date": "2026-11-09",
+    "rust_compiler": "rustc 1.101.0-nightly (8006091eb 2026-10-17)",
+    "arm_c_compiler": "GCC 15.2.0"
+  },
+  "ctest": {
+    "passed": 8,
+    "failed": 0,
+    "cases": [
+      "display_order",
+      "preferences",
+      "foreground_power",
+      "revision_edits",
+      "mock_premium",
+      "mock_login_transition",
+      "mock_free_account",
+      "notifications"
+    ]
+  },
+  "rust": {
+    "passed": 16,
+    "failed": 0
+  },
+  "ui_suites": [
+    "test_preview.py",
+    "test_library_sync.py",
+    "test_library_controls.py"
+  ],
+  "controls": {
+    "status": "passed",
+    "scope": "offline real frontend/mock; no Spotify audio",
+    "assertions": [
+      "category + By you + Downloaded stack",
+      "removing one chip retains the others",
+      "album and artist categories",
+      "sidebar sorting dropdown",
+      "all 320 entries load without scrolling or Load all",
+      "playlist uses plain list with no text filter",
+      "dropdown selection and direction toggle",
+      "outside click dismisses without changing sort",
+      "Escape dismisses without navigating"
+    ]
+  },
+  "final_wording_check": "After the complete suite, empty/retry labels were corrected; preview rebuilt and controls suite passed again.",
+  "preview_executable_sha256": "5e7dd334696a548bc582a3c95ec772fbb5370627914154a435d5789f3b1fac74",
+  "power_policy": "Foreground SDK default tick; legacy dim/off timers and screen-off combo disabled; shell policy unchanged on Home",
+  "new_vita_screen_ui_acceptance": "pending",
+  "live_spotify_acceptance": "pending",
+  "prior_home_playback": "preview.3 user-reported success; see preview3-home-user-report.json"
+}

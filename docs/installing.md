@@ -1,7 +1,8 @@
 # Install, update and device acceptance
 
-No public VPK release is attached. A locally built preview can update the existing
-main player bubble: title ID `VTAM00001`, APP_VER `01.14`, title **Vitafy**.
+The [0.1.0 release](https://github.com/SpeedyNabz/Vitafy/releases/tag/v0.1.0)
+provides the user-accepted Home 01.29 package. It updates the existing main player
+bubble. Local build configurations use: title ID `VTAM00001`, APP_VER `01.30` (foreground) or `01.29` (experimental Home), title **Vitafy**.
 It does not replace the separate Service Probe title.
 
 The Vita data path stays `ux0:data/VitaSpot/` so saved sign-in, preferences and
