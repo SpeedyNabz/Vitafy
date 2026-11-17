@@ -16,7 +16,7 @@ use librespot_core::{
 use librespot_discovery::Discovery;
 use librespot_playback::{
     config::{Bitrate, NormalisationMethod, PlayerConfig, VolumeCtrl},
-    mixer::{softmixer::SoftMixer, Mixer, MixerConfig},
+    mixer::{Mixer, MixerConfig},
     player::{Player, PlayerEvent, PlayerEventChannel},
 };
 use tokio::sync::{mpsc::UnboundedReceiver, oneshot};
@@ -30,10 +30,10 @@ use crate::model::Item;
 use crate::pages;
 use crate::platform;
 use crate::saved;
+use crate::volume;
 use crate::shared::{PlayerMeta, Shared};
 use crate::state::Backend;
 use crate::util::{copy_str, now_ms_inner, sha1_hex};
-use crate::volume::{self, SystemMixer};
 
 /// Commands sent from the C API (UI thread) into the engine task.
 #[derive(Debug)]
@@ -109,9 +109,6 @@ const SUSPEND_GAP_MS: u64 = 30_000;
 // blink back to an older value, so show the requested value for this long
 // after the last change, then resync from Spirc.
 const SETTLE_MS: u64 = 1000;
-// The volume slider counts as being dragged this long after its last value;
-// meanwhile it, not the volume buttons, decides the volume.
-const SLIDER_ACTIVE_MS: u64 = 300;
 // How long a skip waits for Spotify's autoplay songs to arrive.
 const NEXT_WAIT_MS: u64 = 4000;
 
@@ -148,8 +145,6 @@ struct Engine {
     spirc: Option<Spirc>,
     player: Option<Arc<Player>>,
     mixer: Option<Arc<dyn Mixer>>,
-    /// Set on the Vita, where the mixer drives the console volume.
-    system_mixer: Option<Arc<SystemMixer>>,
     player_events: Option<PlayerEventChannel>,
     spirc_done: Option<oneshot::Receiver<()>>,
     discovery: Option<Discovery>,
@@ -161,8 +156,6 @@ struct Engine {
     pending_repeat: Option<(i32, u64)>,
     /// Requested volume and the time (ms) until which it overrides Spirc.
     held_volume: Option<(u16, u64)>,
-    /// When the UI last set the volume (ms).
-    ui_volume_at: u64,
     reconnect_at: Option<tokio::time::Instant>,
     discovery_retry_at: Option<tokio::time::Instant>,
     last_wifi: bool,
@@ -172,6 +165,7 @@ struct Engine {
     /// Tracks that failed to load since the last one played. Spirc (vendored)
     /// stops playback once a few in a row fail; this picks the message.
     unavailable_in_a_row: u32,
+    play_request_id: Option<u64>,
 }
 
 impl Engine {
@@ -213,7 +207,6 @@ impl Engine {
             spirc: None,
             player: None,
             mixer: None,
-            system_mixer: None,
             player_events: None,
             spirc_done: None,
             discovery: None,
@@ -223,7 +216,6 @@ impl Engine {
             pending_volume: None,
             pending_repeat: None,
             held_volume: None,
-            ui_volume_at: 0,
             reconnect_at: None,
             discovery_retry_at: None,
             last_wifi: wifi,
@@ -231,6 +223,7 @@ impl Engine {
             shutting_down: false,
             library_sync: None,
             unavailable_in_a_row: 0,
+            play_request_id: None,
         };
 
         // Auto-login with stored credentials, otherwise advertise over
@@ -332,6 +325,7 @@ impl Engine {
                 }
                 Tick::PlayerEvent(None) => {
                     self.player_events = None;
+                    self.play_request_id = None;
                     true
                 }
                 Tick::SpircDone => {
@@ -360,7 +354,6 @@ impl Engine {
                     true
                 }
                 Tick::Volume => {
-                    self.follow_system_volume();
                     self.flush_volume();
                     true
                 }
@@ -416,7 +409,6 @@ impl Engine {
             Command::SetVolume(volume) => {
                 self.pending_volume = Some(volume);
                 self.held_volume = Some((volume, now_ms_inner() + SETTLE_MS));
-                self.ui_volume_at = now_ms_inner();
                 self.optimistic_volume(volume);
             }
             Command::Play {
@@ -891,6 +883,11 @@ impl Engine {
     // ------------------------------------------------------------------
 
     fn handle_player_event(&mut self, event: PlayerEvent) {
+        if let PlayerEvent::PlayRequestIdChanged { play_request_id } = event {
+            self.play_request_id = Some(play_request_id);
+            return;
+        }
+        if !current_play_event(self.play_request_id, &event) { return; }
         match event {
             PlayerEvent::TrackChanged { audio_item } => {
                 let mut item = metadata::item_from_audio(&audio_item);
@@ -1079,9 +1076,7 @@ impl Engine {
         next.shuffle = snapshot.shuffle as u8;
         next.repeat = self.shown_repeat(repeat_mode(snapshot.repeat_context, snapshot.repeat_track));
         next.is_active_device = snapshot.is_active as u8;
-        if snapshot.volume > 0 {
-            next.volume = self.shown_volume(snapshot.volume);
-        }
+        next.volume = self.shown_volume(snapshot.volume); // zero is a valid mute
 
         // Track metadata: prefer what the player decoded, then the cache.
         let track_changed = !state_uri_is(&next.track.uri, &snapshot.track_uri);
@@ -1238,33 +1233,8 @@ impl Engine {
                 log::warn!("could not set volume: {why}");
             }
         }
-        if let Some(mixer) = &self.mixer {
-            mixer.set_volume(volume);
-        }
-    }
-
-    /// Pick up volume button presses: when the console volume no longer
-    /// matches the Connect volume, make Connect (and the slider) follow it.
-    fn follow_system_volume(&mut self) {
-        let Some(mixer) = &self.system_mixer else {
-            return;
-        };
-        if !mixer.controls_system() || self.pending_volume.is_some() {
-            return;
-        }
-        if now_ms_inner().saturating_sub(self.ui_volume_at) < SLIDER_ACTIVE_MS {
-            return; // the slider is moving it
-        }
-        let Some(system) = volume::system_volume() else {
-            return;
-        };
-        if volume::to_step(system) == volume::to_step(mixer.volume()) {
-            return;
-        }
-        mixer.follow(system);
-        self.pending_volume = Some(system);
-        self.held_volume = Some((system, now_ms_inner() + SETTLE_MS));
-        self.optimistic_volume(system);
+        // Spirc is the sole writer to the mixer. Applying here as well reorders
+        // slider writes relative to remote volume commands and their echoes.
     }
 
     // ------------------------------------------------------------------
@@ -1430,19 +1400,11 @@ impl Engine {
             volume_ctrl: VolumeCtrl::Log(60.0),
             ..MixerConfig::default()
         };
-        // Where the console has a system volume, Connect follows it and the
-        // session starts at whatever the volume buttons were left at.
-        let system_volume = volume::system_volume();
-        let (mixer, system_mixer): (Arc<dyn Mixer>, Option<Arc<SystemMixer>>) = if system_volume.is_some() {
-            let mixer = Arc::new(
-                SystemMixer::open(mixer_config).map_err(|e| format!("audio mixer: {e}"))?,
-            );
-            (mixer.clone(), Some(mixer))
-        } else {
-            let mixer = SoftMixer::open(mixer_config).map_err(|e| format!("audio mixer: {e}"))?;
-            (Arc::new(mixer), None)
-        };
-        let initial_volume = system_volume.unwrap_or(config.initial_volume);
+        // App/Connect volume is independent of the Vita's route-specific levels.
+        // AVConfig's generic volume does not identify Bluetooth vs speaker state;
+        // polling and writing it back can fight the shell/headset on route changes.
+        let mixer = volume::open(mixer_config).map_err(|e| e.to_string())?;
+        let initial_volume = config.initial_volume;
         mixer.set_volume(initial_volume);
         self.optimistic_volume(initial_volume);
 
@@ -1501,7 +1463,6 @@ impl Engine {
         self.spirc = Some(spirc);
         self.player = Some(player);
         self.mixer = Some(mixer);
-        self.system_mixer = system_mixer;
         self.player_events = Some(player_events);
         self.spirc_done = Some(done_rx);
         self.credentials = Some(credentials);
@@ -1621,9 +1582,9 @@ impl Engine {
             session.shutdown();
         }
         self.player_events = None;
+        self.play_request_id = None;
         self.spirc_done = None;
         self.mixer = None;
-        self.system_mixer = None;
         self.shared.web.clear_session();
         self.shared.browse.deactivate();
         self.backend.ordered.lock().unwrap().reset(self.shared.web.epoch());
@@ -1650,9 +1611,9 @@ impl Engine {
         self.phase = Phase::WaitingForCredentials;
         self.player = None;
         self.player_events = None;
+        self.play_request_id = None;
         self.spirc_done = None;
         self.mixer = None;
-        self.system_mixer = None;
         self.spirc = None;
         self.shared.web.clear_session();
         self.shared.browse.deactivate();
@@ -1867,5 +1828,24 @@ fn repeat_mode(context: bool, track: bool) -> i32 {
         VAM_REPEAT_CONTEXT
     } else {
         VAM_REPEAT_OFF
+    }
+}
+
+fn current_play_event(current: Option<u64>, event: &PlayerEvent) -> bool {
+    event.get_play_request_id().map_or(true, |id| current == Some(id))
+}
+
+#[cfg(test)]
+mod playback_event_tests {
+    use super::*;
+    #[test]
+    fn stale_load_events_cannot_override_a_new_skip_or_restore_old_buffering() {
+        let id = librespot_core::SpotifyUri::from_uri("spotify:track:0000000000000000000001").unwrap();
+        let old = PlayerEvent::Loading { play_request_id: 10, track_id: id.clone(), position_ms: 0 };
+        let next = PlayerEvent::Playing { play_request_id: 11, track_id: id, position_ms: 0 };
+        assert!(!current_play_event(Some(11), &old));
+        assert!(current_play_event(Some(11), &next));
+        assert!(!current_play_event(None, &old));
+        assert!(current_play_event(Some(11), &PlayerEvent::VolumeChanged { volume: 0 }));
     }
 }

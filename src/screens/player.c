@@ -462,6 +462,7 @@ void screen_now_playing(void)
     seek_slider(ui_id("np.seek"), rect(x0, oy + 262, w, 5), true, oy + 276, 0);
     transport("np", x0 + w / 2, oy + 346, 72, 32, 30);
 
+    text_draw("App volume", x0 + 36, oy + 391, FS_XS, FW_REGULAR, rgb(C_SUBTEXT), w - 36);
     gfx_icon(ICON_VOLUME, x0 + 10, oy + 420, 20, rgb(C_SUBTEXT));
     volume_slider(ui_id("np.volume"), rect(x0 + 36, oy + 418, w - 36, 4));
 

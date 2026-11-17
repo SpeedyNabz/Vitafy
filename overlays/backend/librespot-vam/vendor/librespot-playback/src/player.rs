@@ -42,7 +42,28 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::SAMPLES_PER_SECOND;
 
-const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
+/// Start preparing one next song once the current stream has a three-second
+/// cushion. Waiting for the entire current FLAC file made early Next a cold load.
+#[doc(hidden)]
+pub fn next_preload_ready(position_ms: u32, remaining_ms: u32, buffered_ms: u64, complete: bool) -> bool {
+    (position_ms >= 2000 && (buffered_ms >= 3000 || complete))
+        || (remaining_ms < 30000 && complete)
+}
+/// Bound asynchronous loading work and cancel it when its consumer is gone.
+/// Blocking decoder/file operations still require their own underlying IO timeout.
+#[doc(hidden)]
+pub async fn bounded_track_load<T, F>(result_tx: &mut oneshot::Sender<T>, load: F, limit: Duration) -> Option<T>
+where F: Future<Output = Option<T>> {
+    tokio::select! {
+        biased;
+        _ = result_tx.closed() => None,
+        result = tokio::time::timeout(limit, load) => match result {
+            Ok(data) => data,
+            Err(_) => { warn!("Track loader exceeded its async deadline"); None }
+        },
+    }
+}
+
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
 pub const PCM_AT_0DBFS: f64 = 1.0;
 
@@ -1369,19 +1390,10 @@ impl Future for PlayerInternal {
                     Poll::Ready(Err(_)) => {
                         debug!("Unable to preload {track_id:?}");
                         self.preload = PlayerPreload::None;
-                        // Let Spirc know that the track was unavailable.
-                        if let PlayerState::Playing {
-                            play_request_id, ..
-                        }
-                        | PlayerState::Paused {
-                            play_request_id, ..
-                        } = self.state
-                        {
-                            self.send_event(PlayerEvent::Unavailable {
-                                track_id,
-                                play_request_id,
-                            });
-                        }
+                        // A speculative download failure is not proof that this song
+                        // is unavailable. Leave its queue entry intact; an explicit
+                        // load can retry and report a real foreground failure.
+                        warn!("Speculative preload failed; retaining next queue entry");
                     }
                     Poll::Pending => (),
                 }
@@ -1518,6 +1530,7 @@ impl Future for PlayerInternal {
                 play_request_id,
                 duration_ms,
                 stream_position_ms,
+                bytes_per_second,
                 ref mut stream_loader_controller,
                 ref mut suggested_to_preload_next_track,
                 ..
@@ -1527,6 +1540,7 @@ impl Future for PlayerInternal {
                 play_request_id,
                 duration_ms,
                 stream_position_ms,
+                bytes_per_second,
                 ref mut stream_loader_controller,
                 ref mut suggested_to_preload_next_track,
                 ..
@@ -1534,10 +1548,11 @@ impl Future for PlayerInternal {
             {
                 let track_id = track_id.clone();
 
-                if (!*suggested_to_preload_next_track)
-                    && ((duration_ms as i64 - stream_position_ms as i64)
-                        < PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS as i64)
-                    && stream_loader_controller.range_to_end_available()
+                let buffered_ms = (stream_loader_controller.buffered_ahead_bytes() as u64)
+                    .saturating_mul(1000) / (bytes_per_second.max(1) as u64);
+                if !*suggested_to_preload_next_track
+                    && next_preload_ready(stream_position_ms, duration_ms.saturating_sub(stream_position_ms),
+                        buffered_ms, stream_loader_controller.range_to_end_available())
                 {
                     *suggested_to_preload_next_track = true;
                     self.send_event(PlayerEvent::TimeToPreloadNextTrack {
@@ -2406,13 +2421,16 @@ impl PlayerInternal {
             local_file_lookup: self.local_file_lookup.clone(),
         };
 
-        let (result_tx, result_rx) = oneshot::channel();
+        let (mut result_tx, result_rx) = oneshot::channel();
 
         let load_handles_clone = self.load_handles.clone();
         let handle = tokio::runtime::Handle::current();
 
         let load_handle = thread::spawn(move || {
-            let data = handle.block_on(loader.load_track(spotify_uri, position_ms));
+            let started = Instant::now();
+            let data = handle.block_on(bounded_track_load(&mut result_tx,
+                loader.load_track(spotify_uri, position_ms), Duration::from_secs(45)));
+            debug!("Track loader completed in {} ms; cancelled={}", started.elapsed().as_millis(), result_tx.is_closed());
             if let Some(data) = data {
                 let _ = result_tx.send(data);
             }

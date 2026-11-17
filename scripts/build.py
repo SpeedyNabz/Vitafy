@@ -94,7 +94,7 @@ def native(source, args):
     with zipfile.ZipFile(package) as archive:
         if archive.testzip(): raise ValueError("VPK CRC failure")
         metadata = sfo(archive.read("sce_sys/param.sfo"))
-        for key, expected in dict(TITLE="Vitafy", TITLE_ID="VTAM00001", APP_VER="01.29" if args.home_playback else "01.30", ATTRIBUTE=32776 if args.home_playback else 32768).items():
+        for key, expected in dict(TITLE="Vitafy", TITLE_ID="VTAM00001", APP_VER="01.31" if args.home_playback else "01.32", ATTRIBUTE=32776 if args.home_playback else 32768).items():
             if metadata.get(key) != expected: raise ValueError("Wrong package metadata: " + key)
         if archive.read("eboot.bin")[:4] != b"SCE\0": raise ValueError("Invalid SELF")
         if len(set(archive.namelist())) != len(archive.namelist()): raise ValueError("Duplicate archive entries")

@@ -1,0 +1,9 @@
+{
+  "date_recorded": "2026-11-17",
+  "reported_build": "0.1.0 / preview.7 Home",
+  "evidence_type": "user report",
+  "volume": "It jumps between the Vita's device volume and its Bluetooth-specific volume.",
+  "next": "It buffers for a long time.",
+  "agent_device_test": false,
+  "fix_validation": "pending user test of 0.1.1-preview.1"
+}

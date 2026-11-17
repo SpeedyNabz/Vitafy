@@ -126,3 +126,45 @@ mod vitafy_regression_tests {
         assert_eq!(&c.entry_id[..11],b"duplicate-2");assert_eq!(VAM_API_VERSION,6);
     }
 }
+
+#[cfg(test)]
+mod early_preload_tests {
+    use librespot_playback::player::next_preload_ready;
+    #[test]
+    fn early_next_prepares_after_safe_headroom_without_waiting_for_whole_song() {
+        assert!(!next_preload_ready(0, 240000, 30000, false));
+        assert!(!next_preload_ready(2000, 238000, 2999, false));
+        assert!(next_preload_ready(2000, 238000, 3000, false));
+        assert!(next_preload_ready(5000, 235000, 9000, false));
+        assert!(!next_preload_ready(5000, 235000, 0, false));
+        assert!(next_preload_ready(2000, 238000, 0, true));
+        assert!(next_preload_ready(0, 10000, 0, true));
+    }
+}
+
+#[cfg(test)]
+mod loader_lifetime_tests {
+    use librespot_playback::player::bounded_track_load;
+    use std::{sync::{Arc, atomic::{AtomicBool, Ordering}}, time::Duration};
+    struct DropFlag(Arc<AtomicBool>);
+    impl Drop for DropFlag { fn drop(&mut self) { self.0.store(true, Ordering::SeqCst); } }
+    #[test]
+    fn superseded_and_timed_out_network_futures_are_dropped() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let (mut tx, rx) = tokio::sync::oneshot::channel::<u32>();
+            assert_eq!(bounded_track_load(&mut tx, async { Some(7) }, Duration::from_secs(1)).await, Some(7));
+            drop(rx);
+            let dropped = Arc::new(AtomicBool::new(false));
+            let guard = DropFlag(dropped.clone());
+            let pending = async move { let _guard = guard; std::future::pending::<Option<u32>>().await };
+            assert_eq!(bounded_track_load(&mut tx, pending, Duration::from_secs(1)).await, None);
+            assert!(dropped.load(Ordering::SeqCst));
+            let (mut tx, _rx) = tokio::sync::oneshot::channel::<u32>();
+            let dropped = Arc::new(AtomicBool::new(false));
+            let guard = DropFlag(dropped.clone());
+            let pending = async move { let _guard = guard; std::future::pending::<Option<u32>>().await };
+            assert_eq!(bounded_track_load(&mut tx, pending, Duration::from_millis(5)).await, None);
+            assert!(dropped.load(Ordering::SeqCst));
+        });
+    }
+}

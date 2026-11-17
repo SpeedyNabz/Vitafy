@@ -1,0 +1,51 @@
+{
+  "version": "0.1.1-preview.1",
+  "date": "2026-11-17",
+  "scope": "real Rust host logic and Windows mock frontend; no Bluetooth or Spotify audio test",
+  "source_lock_sha256": "37778d4541a2de4c4f7f048cc0bb8aebc9a267f0423109934d6c2c0007704e72",
+  "upstream": {
+    "name": "VitaSpot",
+    "repository": "https://github.com/0oPerryo0/VitaSpot.git",
+    "commit": "81c533f1ef61623360ea4fbe32cf29b4f2f3901f",
+    "version": "0.0.4"
+  },
+  "sdk": {
+    "rust_toolchain": "nightly-2026-10-18",
+    "target": "armv7-sony-vita-newlibeabihf",
+    "sdk_revision": "sdk-snapshot-20260825.611.1",
+    "sdk_channel": "2026.08",
+    "sdk_channel_sequence": "2026102473",
+    "sdk_package_release": "packages-2026.08-snapshot-20261024.61.1",
+    "sdk_core_version": "2026.08.1-1",
+    "sdk_installer_commit": "c9ba33bd428ba88052f79d78592f4b318a7a322b",
+    "sdk_status": "installed and native ARM build verified",
+    "configured_date": "2026-11-09",
+    "rust_compiler": "rustc 1.101.0-nightly (8006091eb 2026-10-17)",
+    "arm_c_compiler": "GCC 15.2.0"
+  },
+  "rust": {
+    "passed": 32,
+    "failed": 0,
+    "added_checks": [
+      "route-independent app gain and mute",
+      "early preload headroom, complete file and short track",
+      "superseded and timed-out async futures are dropped",
+      "stale playback events cannot override a newer request"
+    ]
+  },
+  "ctest": {
+    "passed": 9,
+    "failed": 0
+  },
+  "ui_suites": [
+    "test_preview.py",
+    "test_library_sync.py",
+    "test_library_controls.py",
+    "test_search_keyboard.py",
+    "test_large_playback.py"
+  ],
+  "preview_executable_sha256": "b22f6cafa4a19832a2a1bf2fac03514f9f6159347c287a7e6716ad03458a38e0",
+  "device_latency": "not measured",
+  "bluetooth": "pending user acceptance",
+  "public_release": "0.1.0 unchanged"
+}

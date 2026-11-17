@@ -120,6 +120,7 @@ struct SpircTask {
 
     /// VitaSpot: shared read-only snapshot handed out through [Spirc::snapshot].
     shared_snapshot: Arc<Mutex<ConnectSnapshot>>,
+    preload_target: Option<SpotifyUri>,
 
     /// VitaSpot: tracks that failed to load since the last one played.
     unavailable_in_a_row: u32,
@@ -292,6 +293,7 @@ impl Spirc {
 
             spirc_id,
             shared_snapshot: Arc::clone(&shared_snapshot),
+            preload_target: None,
             unavailable_in_a_row: 0,
         };
 
@@ -682,6 +684,7 @@ impl SpircTask {
     }
 
     fn publish_snapshot(&mut self) {
+        self.refresh_preload_target();
         let snapshot = self.connect_state.snapshot(self.now_ms());
         if let Ok(mut guard) = self.shared_snapshot.lock() {
             *guard = snapshot;
@@ -1647,8 +1650,17 @@ impl SpircTask {
             _ => (),
         }
 
-        if let Some(track_id) = self.connect_state.preview_next_track() {
-            self.player.preload(track_id);
+        self.refresh_preload_target();
+    }
+
+    fn refresh_preload_target(&mut self) {
+        let requested = self.connect_state.is_active() && matches!(self.play_status,
+            SpircPlayStatus::Playing { preloading_of_next_track_triggered: true, .. }
+            | SpircPlayStatus::Paused { preloading_of_next_track_triggered: true, .. });
+        let target = if requested { self.connect_state.preview_next_track() } else { None };
+        if target != self.preload_target {
+            if let Some(track_id) = target.as_ref() { self.player.preload(track_id.clone()); }
+            self.preload_target = target;
         }
     }
 
