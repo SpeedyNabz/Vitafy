@@ -1,5 +1,8 @@
 > Archived lab handover. Read [current status](../status.md) first; no historical VPKs or raw device logs are distributed here.
 
+> Current context, 17 November 2026: see [current findings](../research/current-findings.md) and the [open work plan](../open-work-plan.md). The historical results and instructions below retain their original scope; they are not new device-test requests.
+
+
 # Technical findings and boundaries
 
 ## Lifecycle and audio ownership

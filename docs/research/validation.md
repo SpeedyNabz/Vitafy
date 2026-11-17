@@ -1,5 +1,8 @@
 > Historical lab research, 8–11 November 2026. Read [current status](../status.md) first. Paths referring to lab artifacts are historical references, not included downloads.
 
+> Current context, 17 November 2026: see [current findings](current-findings.md) and the [open work plan](../open-work-plan.md). The historical results and instructions below retain their original scope; they are not new device-test requests.
+
+
 # Executed validation
 
 Hardware clarification, 11 November 2026: the user confirms all reported Vita/device tests were on a **real modded PCH-1003**, not an emulator. Firmware and installed plugins remain unspecified. Windows mock/native build/package checks are host-side evidence. The historical 8 November setup/mock sections below describe local checks without a connected Vita/account; subsequent device sections contain the user's physical-hardware observations.

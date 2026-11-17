@@ -1,5 +1,8 @@
 > Historical lab research, 8–11 November 2026. Read [current status](../status.md) first. Paths referring to lab artifacts are historical references, not included downloads.
 
+> Current context, 17 November 2026: see [current findings](current-findings.md) and the [open work plan](../open-work-plan.md). The historical results and instructions below retain their original scope; they are not new device-test requests.
+
+
 # Configured native toolchain
 
 Configured 9 November 2026 for this project. The user-wide Rust default remains stable; rust-toolchain.toml selects the pinned nightly inside this project.

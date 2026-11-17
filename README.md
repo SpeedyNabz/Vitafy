@@ -46,6 +46,10 @@ Vitafy is not affiliated with or endorsed by Spotify or Sony.
 Download the VPK from the [0.1.0 release](https://github.com/SpeedyNabz/Vitafy/releases/tag/v0.1.0).
 See the [release notes](docs/releases/0.1.0.md) for installation, checks and known limits.
 
+Development build **0.1.1-preview.1** addresses reported Bluetooth-volume jumps
+and long skip buffering; see the [investigation and test-build notes](docs/bluetooth-volume-and-skip-buffering.md).
+The released package above remains the user-accepted 0.1.0 build.
+
 ## Quick start: offline desktop preview
 
 Install Git, Python 3.9+, CMake 3.24+ and a C compiler. Windows uses Visual Studio
@@ -97,6 +101,8 @@ existing component/font notices; unresolved frontend/asset terms are recorded in
 - [Install, update and device acceptance](docs/installing.md)
 - [Architecture and notification behavior](docs/architecture.md)
 - [Research index and historical experiments](docs/research-index.md)
+- [Open work plan: app reliability and cross-app/game playback](docs/open-work-plan.md)
+- [Current research findings](docs/research/current-findings.md)
 - [Roadmap](docs/roadmap.md) and [contributing](CONTRIBUTING.md)
 - [Private data and issue reports](SECURITY.md)
 

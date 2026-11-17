@@ -1,7 +1,40 @@
 # Current status
 
-This is the authoritative status page for Vitafy 0.1.0 (preview.7 build). Historical
-research files retain the conclusions and pending statements from their own dates.
+Updated 17 November 2026. Released baseline: **0.1.0** (preview.7 Home build).
+Development candidate: **0.1.1-preview.1**. This page separates code/build results
+from user-reported and measured device results. Historical research preserves its
+original dates and conclusions. Use the [open work plan](open-work-plan.md) for
+what remains, and [current findings](research/current-findings.md) for the synthesis.
+
+## Development: 0.1.1-preview.1 Bluetooth volume and skip buffering
+
+The user reports device/Bluetooth volume alternation and long Next buffering.
+This Home 01.31 test build separates app/Connect gain from route-specific hardware
+volume, preloads one next song earlier when buffered headroom permits, cancels
+superseded async loaders and rejects stale progress events. Speculative failures
+no longer mark queued songs unavailable. See the
+[investigation, validation and device checks](bluetooth-volume-and-skip-buffering.md).
+Release 0.1.0 remains unchanged; Bluetooth and skip-latency acceptance is pending.
+32 real Rust tests, nine desktop CTest cases, five offline UI suites and fresh
+native Home package checks passed. Native symbol checks verify no generic
+system-volume getter/setter and retained debug sections. Evidence:
+[host](evidence/bluetooth-skip-host.json), [native](evidence/bluetooth-skip-home-native.json),
+[user-reported defect](evidence/bluetooth-skip-user-report.json).
+
+## Cross-app/game status
+
+No current build is proven to keep audio working across games. Historical
+worker-only LiveArea persistence passed for a tiny no-audio probe by user report;
+real backend idle discovery and shutdown passed with audio blocked. The bounded
+real-audio service probe has no recorded acceptance. Its old 15.16 MiB static
+footprint and 48 MiB SELF/24 MiB heap request do not establish current decoding or
+game resource headroom. The current ABI v6 backend must be measured independently.
+
+The preferred candidate is a separate userland audio owner with a detachable UI,
+subject to actual worker feasibility, active-audio cleanup/lifetime and bounded
+IPC evidence. See [gates B0-B6](open-work-plan.md#cross-app-playback-gates).
+The known game-triggered forced-close shell hang remains; do not repeat it.
+True suspend and universal app/game compatibility are not established.
 
 ## Release 0.1.0
 

@@ -1,5 +1,8 @@
 > Historical lab research, 8–11 November 2026. Read [current status](../status.md) first. Paths referring to lab artifacts are historical references, not included downloads.
 
+> Current context, 17 November 2026: see [current findings](current-findings.md) and the [open work plan](../open-work-plan.md). The historical results and instructions below retain their original scope; they are not new device-test requests.
+
+
 # Isolating package attributes after a working rollback
 
 **Device result:** the user reports closing, other apps/folders and reopening all work on this control. A separate PS/Home check stops music and returning resumes it. This supports the ATTRIBUTE configuration as a contributor to the close regression but does not isolate its two changed bits. The next [graphics-gated Home experiment](home-lifecycle.md) has separate source changes and remains unverified on device.

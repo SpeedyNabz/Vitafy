@@ -1,5 +1,8 @@
 > Historical lab research, 8–11 November 2026. Read [current status](../status.md) first. Paths referring to lab artifacts are historical references, not included downloads.
 
+> Current context, 17 November 2026: see [current findings](current-findings.md) and the [open work plan](../open-work-plan.md). The historical results and instructions below retain their original scope; they are not new device-test requests.
+
+
 # Separate player lifetime: bounded worker preflight
 
 **Latest device result:** Service Probe 0.2 returned start_bg_app=0; the user confirms heartbeat samples keep increasing after the launcher returns to Home. The supplied log now confirms samples 0 through 60 under worker PID 9055701 and a limit-stop record after 120.31 seconds. The user confirms post-stop shell health is normal. Independent process exit is not measured. The [real-backend static audit](service-memory.md) now shows 15.16 MiB of load segments before runtime allocations. See [current evidence and next check](service-launch-result.md).

@@ -1,5 +1,8 @@
 > Historical lab research, 8–11 November 2026. Read [current status](../status.md) first. Paths referring to lab artifacts are historical references, not included downloads.
 
+> Current context, 17 November 2026: see [current findings](current-findings.md) and the [open work plan](../open-work-plan.md). The historical results and instructions below retain their original scope; they are not new device-test requests.
+
+
 # Service Probe 0.4-close-control.1
 
 The 0.3 memory probe's intended stop and normal post-stop shell behavior are confirmed. This next check isolates removal of the launcher's LiveArea page. It is not a test of killing an active graphical frontend, and does not establish game-triggered closure safety.

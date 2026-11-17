@@ -2,12 +2,28 @@
 
 Read [current status](status.md) first. The following notes preserve the original research and experiment reasoning. They are not download links or fresh hardware results. Raw device logs, credentials, lab archives and historical VPKs are not published. Machine-local paths are generalized as `<lab>`.
 
+## Current research synthesis and open work
+
+Updated 17 November 2026. [Current findings](research/current-findings.md) combines
+the newer app work with the historical service results without upgrading their
+evidence. [The open work plan](open-work-plan.md) is the living dependency list
+for app reliability and playback alongside supported apps/games.
+
+- [Bluetooth volume and long Next buffering](bluetooth-volume-and-skip-buffering.md):
+  reported defect, source hypotheses, candidate fixes, tests and device acceptance.
+- [Loading/cache and sorted-playback investigation](loading-cache-and-sorted-playback-investigation.md):
+  original baseline; implemented bounds are in [preview.7](releases/preview7.md).
+- [Release 0.1.0](releases/0.1.0.md) and [0.1.1-preview.1 test build](releases/0.1.1-preview1.md).
+- [Host candidate evidence](evidence/bluetooth-skip-host.json),
+  [native candidate evidence](evidence/bluetooth-skip-home-native.json) and
+  [reported device defect](evidence/bluetooth-skip-user-report.json).
+
 ## Current guides
 
 - [Build and test](building.md)
 - [Installation and acceptance](installing.md)
 - [Architecture and notifications](architecture.md)
-- [Roadmap](roadmap.md)
+- [Roadmap](roadmap.md) and [open work plan](open-work-plan.md)
 
 ## Historical technical research
 

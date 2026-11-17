@@ -1,6 +1,7 @@
 # Spotify desktop UI audit and implementation status
 
-Updated 15 November 2026 for **0.1.0-preview.7 / backend ABI v6**. The desktop
+Updated 17 November 2026: released **0.1.0**, development **0.1.1-preview.1**,
+backend ABI v6. The original 15 November desktop
 comparison used the user's open Spotify Windows app and supplied screenshot.
 The user subsequently accepted the preview.7 Home build for release 0.1.0;
 see the [device report](evidence/preview7-home-user-report.json). Builds/mocks
@@ -12,10 +13,16 @@ and dependency revisions remain pinned; canonical overlays and their hashes are
 in `source-lock.json`. ABI v6 requires the freshly built backend. The historical
 ABI v3 audio archive is rejected by the current build script.
 
+The [open work plan](open-work-plan.md) tracks the remaining UI/backend/device
+work. The [Bluetooth/skip candidate](bluetooth-volume-and-skip-buffering.md) has
+host/native evidence but no new user device acceptance. General acceptance of
+0.1.0 does not replace the specific live-account/stress checks listed below.
+
 ## Implemented
 
 | Area | Current implementation | Bounds and acceptance |
 | --- | --- | --- |
+| Candidate volume/preload | 0.1.1-preview.1 uses independent app gain, one earlier next-song preload, obsolete async-load cancellation and stale-event guards | Physical buttons control hardware levels separately. Bluetooth, audible latency and underrun tests pending; 45-second async deadline does not bound blocking IO |
 | Persistent library sidebar | Artwork, title/owner, selected playlist, playing indicator, context menu, Liked Songs, retry and paged library | Actual-account touch/D-pad acceptance pending |
 | Playlist track sorts | Dropdown with Custom order, Title, Artist, Album, Recently added, Release date, Duration; select active sort to reverse direction | Missing dates remain last; stable ties preserve duplicate-entry offsets. ASCII case folding preserves UTF-8 but does not reproduce Spotify's language-specific collation |
 | Metadata | Album name, album release date, per-entry added timestamp, entry ID, original index and snapshot revision | Unknown source fields stay unknown; no URI-as-name or position-as-date substitutions |
@@ -97,7 +104,7 @@ that a Spotify server accepted an edit.
   Existing recently played shelves, album/artist navigation and lyrics remain.
 - Download/offline mode, video, Smart Shuffle, Mix, social activity, collaborators,
   tour content and a device picker remain deferred backend/service projects.
-- Preview.3 Home playback is confirmed by user report. Preview.4 display/UI behavior,
+- Preview.7 Home is generally accepted as release 0.1.0 by user report. Specific display/UI behavior,
   FLAC availability, host-device like reconciliation, API edit
   entitlement, Wi-Fi recovery, long soak, Home/return and orderly exit need device
   evidence. Separate service/IPC integration, game coexistence and sleep remain

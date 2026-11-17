@@ -1,5 +1,8 @@
 > Historical lab research, 8–11 November 2026. Read [current status](../status.md) first. Paths referring to lab artifacts are historical references, not included downloads.
 
+> Current context, 17 November 2026: see [current findings](current-findings.md) and the [open work plan](../open-work-plan.md). The historical results and instructions below retain their original scope; they are not new device-test requests.
+
+
 # Home playback with graphics gated
 
 **Device result:** the user reports Home playback continues, returning works and ordinary closing works on home.1. Accepting a game-triggered forced close while playback runs still hangs the shell and requires a forced reset. Do not repeat that transition. This blocks release despite the Home improvement. The next [no-lease Home control](forced-close-investigation.md) tests ownership calls only; it is not a game force-close fix.

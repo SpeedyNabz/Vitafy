@@ -1,39 +1,29 @@
 # Roadmap
 
-The [desktop UI audit and implementation plan](desktop-ui-audit.md) records the
-15 November live Spotify comparison and preview.3 implementation: lossless-first
-source selection, synchronised hearts, full metadata sorts, scoped filters,
-presentation/history, folders and acknowledged playlist creation/rename/append.
-Preview.3 adds guarded playlist/queue edits and device-local pins/collapsed folders.
-Cloud pin sync and live service/device acceptance remain pending. The Home build remains experimental.
+Updated 17 November 2026. The maintained task list is the
+[open work plan](open-work-plan.md). It records priorities, dependencies, exit
+evidence and deferred features; unchecked items remain open. See
+[current findings](research/current-findings.md) for the research behind it.
 
-Preview.4 adds an always-on foreground display, stacked library filters and sorting
-dropdowns. Playlist pages automatically load all songs and use plain list rows.
-The user confirms preview.3 playback on Home; new display/UI acceptance remains
-pending. Downloaded filtering is present but empty until an offline store exists.
+| Order | Outcome | Open work |
+| --- | --- | --- |
+| Now | Accept the Bluetooth/skip test build and classify remaining stalls | A1-A2: device route/volume/latency tests; blocking IO and underrun diagnostics |
+| App reliability | Reconcile account state, recover playback and measure cache/large orders | A3-A5: live hearts/edits/handoff, Wi-Fi recovery, resource/cache stress and UI acceptance |
+| Next app release | Promote only an accepted candidate with exact provenance | A6: 0.1.0 stays unchanged while 0.1.1-preview.1 awaits device acceptance |
+| Service feasibility | Reproducible current worker within a measured budget; real audio and clean stop | B0-B1: old idle/heartbeat observations do not prove streaming feasibility |
+| Service integration | Audio survives normal UI detach and reconnects through bounded IPC | B2-B3: one playback owner, versioned values, acknowledgements and backpressure |
+| Coexistence | Handle contention and prove supported app/game transitions | B4-B5: no known-unsafe forced-close replay; publish an explicit compatibility matrix |
+| Qualification | Power states, sustained playback, recovery and update/rollback | B6: separate display-off/suspend; archive measured evidence and exclusions |
+| Later | Supported discovery/device controls and additional input polish | C1-C3 after reliability work |
+| Deferred | Offline/download, video and wider social features | C4-C5 need separate service/entitlement/product work |
 
-1. Validate the new frontend's actual audio, Unicode shell notifications and
-   controlled shutdown on a Vita; collect minimal numeric evidence.
-2. Verify authentication/relaunch, Wi-Fi interruptions, reconnect, queue/seek,
-   long playback and bounded memory/cache behavior.
-3. Finish the separate service's bounded real-audio test and active-audio teardown
-   before integrating it with the frontend.
-4. Build a bounded versioned IPC adapter with reconnect/resynchronization and
-   explicit backend event ownership.
-5. Prove active service lifetime and resource budgets before any controlled game
-   coexistence test. Do not repeat the known unsafe game-close transition.
-6. Investigate display-off, power button and true suspend as separate states.
-7. Clarify upstream frontend/assets redistribution terms and complete dependency
-   notices before a public binary release.
+Released 0.1.0 promotes the user-accepted preview.7 Home binary unchanged.
+Development 0.1.1-preview.1 separates app gain from hardware volume, preloads one
+next song earlier, cancels obsolete async loads and rejects stale playback events.
+Host/native checks pass; actual Bluetooth and skip improvement is not yet measured.
 
-These are pending acceptance milestones. Source publication, successful compiling,
-mock checks and idle-service observations do not close them.
-
-Preview.7 implements the [loading/cache plan](releases/preview7.md). Next: measure
-cold/warm browsing and IO/RAM on hardware; verify 10,000-entry sorted playback,
-shuffle/repeat, handoff and audio soak. Host coverage and native builds pass,
-while these physical acceptance tasks remain pending.
-
-Release 0.1.0 promotes preview.7 Home unchanged after user-reported device
-acceptance. See [release notes](releases/0.1.0.md); remaining stress/lifecycle
-checks above retain their narrower evidence requirements.
+Home playback is not game compatibility. The historical worker passed idle
+startup/shutdown and a tiny no-audio LiveArea lifetime test; its real-audio test
+has no recorded acceptance. Current service resource limits remain unmeasured.
+Playback across every app/game is a target subject to platform constraints,
+not a capability inferred from flags or an existing release claim.

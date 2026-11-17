@@ -1,5 +1,8 @@
 > Historical lab research, 8–11 November 2026. Read [current status](../status.md) first. Paths referring to lab artifacts are historical references, not included downloads.
 
+> Current context, 17 November 2026: see [current findings](current-findings.md) and the [open work plan](../open-work-plan.md). The historical results and instructions below retain their original scope; they are not new device-test requests.
+
+
 # Relaunch hang: separate diagnostic
 
 **Withdrawn from further device testing, 9 November:** the user reports that the first launch works, but closing this diagnostic is followed by hangs when opening other apps and folders appearing empty. Use the [recovery guidance](recovery-and-shell-hang.md). Historical build/test instructions below are retained for investigation, not a request to repeat the failing cycle.

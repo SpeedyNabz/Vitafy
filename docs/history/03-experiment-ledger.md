@@ -1,5 +1,8 @@
 > Archived lab handover. Read [current status](../status.md) first; no historical VPKs or raw device logs are distributed here.
 
+> Current context, 17 November 2026: see [current findings](../research/current-findings.md) and the [open work plan](../open-work-plan.md). The historical results and instructions below retain their original scope; they are not new device-test requests.
+
+
 # Experiment ledger
 
 All user-performed Vita/device observations below are attributed to the same **real, modded PS Vita PCH-1003**, confirmed by the user on 11 November 2026. No emulator result is being substituted. Firmware and plugin details are still unknown; Windows mock/native build checks remain host results.

@@ -1,5 +1,8 @@
 > Historical lab research, 8–11 November 2026. Read [current status](../status.md) first. Paths referring to lab artifacts are historical references, not included downloads.
 
+> Current context, 17 November 2026: see [current findings](current-findings.md) and the [open work plan](../open-work-plan.md). The historical results and instructions below retain their original scope; they are not new device-test requests.
+
+
 # Worker-only LiveArea persistence comparison
 
 Both the unflagged control and the parent-only candidate failed to preserve heartbeat progress after LiveArea closure, with normal shell behavior by user report. This package tests the worker placement separately. It is a hypothesis, not a claimed fix.

@@ -1,5 +1,8 @@
 > Historical lab research, 8–11 November 2026. Read [current status](../status.md) first. Paths referring to lab artifacts are historical references, not included downloads.
 
+> Current context, 17 November 2026: see [current findings](current-findings.md) and the [open work plan](../open-work-plan.md). The historical results and instructions below retain their original scope; they are not new device-test requests.
+
+
 # Background playback implementation and limits
 
 Prepared 9 November 2026. The user selected Home/other-app playback and power-button playback if supported. The previous 0.0.4 VPK's core operation is user-reported working. The user reports that launching a game closes 0.0.5-rc.1 and stops playback; other transitions remain unconfirmed. A separate [gdc residency experiment](resident-probe.md) now tests executable boot budgets and a bounded heap without changing the frozen candidate.

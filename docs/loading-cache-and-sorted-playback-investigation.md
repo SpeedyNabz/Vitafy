@@ -170,3 +170,12 @@ Suggested milestones: (1) instrument; (2) snapshot reuse and incremental RAM
 eviction; (3) compact persistent metadata with revalidation; (4) larger-context
 playback strategy and hardware soak. Preview.6 changes only the requested UI;
 the sorted playback limit remains present until that follow-up is implemented.
+
+## Current follow-up, 17 November 2026
+
+The metadata-cache plan is implemented; it is not evidence that audio Next has
+no network latency. Development 0.1.1-preview.1 separately changes next-song
+preloading/cancellation; see [the audio investigation](bluetooth-volume-and-skip-buffering.md).
+Hardware cache/order measurements and worker-specific resource budgets remain
+open in [A4 and B0](open-work-plan.md). Old 15.16 MiB static-service measurements
+must not be reused as the current backend's runtime memory budget.

@@ -1,7 +1,10 @@
 # Build and test
 
 Run commands from the repository root. `python` may be `py` on Windows.
-No command requires a Spotify account for mock testing.
+No command requires a Spotify account for mock testing. Current source builds
+0.1.1-preview.1 (Home 01.31 / foreground 01.32, ABI v6). Published 0.1.0 uses the
+unchanged preview.7 Home 01.29 binary; use tag `v0.1.0` for that source.
+Current findings and remaining acceptance are in the [open work plan](open-work-plan.md).
 
 ## Pinned baseline
 
@@ -88,7 +91,7 @@ python scripts/build.py vita --sdk /path/to/vitasdk
 `--locked` and `-Z build-std`, compiles the newlib/POSIX shim, finds ring's assembly
 archive, and cross-compiles the frontend as RelWithDebInfo. It validates SFO,
 SELF/CRC, package art and native audio/notification imports before copying the VPK
-and hashes into `artifacts/Vitafy-0.1.0-preview.7/`. ELF/VELF remain in `build/native/`.
+and hashes into `artifacts/Vitafy-0.1.1-preview.1/`. ELF/VELF remain in `build/native/`.
 The fresh backend now preserves release debug information as well. Cargo's active
 build-script record selects the matching ring assembly archive when multiple
 profile variants exist. Source reconstruction, native linking and packaging have
@@ -106,14 +109,14 @@ python scripts/build.py vita --sdk /path/to/vitasdk --home-playback
 ```
 
 This uses a separate `build/native-home/` and
-`artifacts/Vitafy-0.1.0-preview.7-home-experimental/`, install version 01.29 and
+`artifacts/Vitafy-0.1.1-preview.1-home-experimental/`, install version 01.31 and
 ATTRIBUTE=32776. Debug ELF/VELF are retained. The default foreground build keeps
-01.30 / ATTRIBUTE=32768. The Home profile reuses the historical no-suspend flag
+01.32 / ATTRIBUTE=32768. The Home profile reuses the historical no-suspend flag
 and existing graphics lifecycle gate; device acceptance is pending. Do not accept
 a game-triggered forced-close prompt during playback: that transition previously
 hung the shell. Pause and use Settings → Exit before opening another app.
-Foreground 01.30 can replace Home 01.29. Switching back to Home after installing
-01.30 requires a newly versioned Home build; choose your profile before installation.
+Foreground 01.32 can replace Home 01.31. Switching back to Home after installing
+01.32 requires a newly versioned Home build; choose your profile before installation.
 
 Build tools may emit the installed SDK's existing `crtn.o` GNU-stack warning.
 No warning-free or memory-safety audit is claimed. Original lab inputs and the
@@ -128,11 +131,17 @@ cargo +nightly-2026-10-18 test --offline --lib --manifest-path build/source/back
 
 This runs real Rust logic tests without credentials or Spotify network requests.
 It is separate from the C/frontend mock checks. Dependencies must already be
-cached for `--offline`. The current suite has 28 tests, including source-quality
+cached for `--offline`. The current suite has 32 tests, including source-quality
 priority, saved-cache consistency, account epochs, metadata preservation, duplicate-safe playlist edits and queue
 context preservation, persistent cache recovery/budgets and real large-context
 serialization/rolling windows. Five frontend UI suites include 5,000-song loading
 and explicit order fallback. Nine CTest cases cover host contracts and preferences.
+The 32 Rust tests also cover app software gain/mute, early-preload headroom,
+obsolete-loader cancellation/deadline and stale playback-event rejection. See
+[candidate host evidence](evidence/bluetooth-skip-host.json). Native symbol checks
+confirmed generic system-volume getter/setter calls are absent and debug sections
+remain; [native evidence](evidence/bluetooth-skip-home-native.json) does not imply
+Bluetooth or audible skip-latency acceptance.
 
 When deliberately editing canonical overlays, review changes, then run
 `python scripts/refresh_sources.py --accept-overlay-edits` to update their lock

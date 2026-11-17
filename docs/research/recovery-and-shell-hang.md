@@ -1,5 +1,8 @@
 > Historical lab research, 8–11 November 2026. Read [current status](../status.md) first. Paths referring to lab artifacts are historical references, not included downloads.
 
+> Current context, 17 November 2026: see [current findings](current-findings.md) and the [open work plan](../open-work-plan.md). The historical results and instructions below retain their original scope; they are not new device-test requests.
+
+
 # Shell hang after closing VitaSpot: recovery first
 
 9 November 2026: the user reports that the relaunch diagnostic opens normally once, but after closing it, other apps also hang at launch and Home-screen bubble folders appear empty. A forced restart was required and restored everything to normal. This is broader than a VitaSpot login/relaunch problem and points to temporary shell state. It does not establish file deletion, filesystem corruption, a specific deadlock or a particular faulty API. bgtest.1 has not been tested.
